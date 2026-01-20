@@ -10,6 +10,7 @@ const firebaseConfig = {
 
 // Inicialização
 firebase.initializeApp(firebaseConfig);
+firebase.database().goOnline();
 const db = firebase.database();
 pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
 
