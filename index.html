@@ -8,7 +8,18 @@
 </head>
 <body>
     <header>
-        <h1>📚 Gerenciador de Estudos</h1>
+        <div class="header-main">
+            <h1>📚 Gerenciador de Estudos</h1>
+            <div class="settings-top">
+                <span>Revisar em:</span>
+                <select id="alarmInterval" onchange="updateAlarmSettings()">
+                    <option value="86400000">1 Dia</option>
+                    <option value="259200000">3 Dias</option>
+                    <option value="604800000">1 Semana</option>
+                </select>
+                <label><input type="checkbox" id="alarmActive" onchange="updateAlarmSettings()"> Alarme</label>
+            </div>
+        </div>
         <div class="controls">
             <input type="file" id="fileInput" multiple accept=".pdf" style="display:none" onchange="handleUpload()">
             <button class="btn" onclick="document.getElementById('fileInput').click()">➕ Adicionar PDF</button>
@@ -41,19 +52,7 @@
             <button class="day-btn" id="btn-day-0" onclick="setDay(0)">Dom</button>
         </div>
 
-        <div class="content-header">
-            <h2 id="dayTitle">Cronograma</h2>
-            <div class="settings-mini">
-                Revisar: 
-                <select id="alarmInterval" onchange="updateAlarmSettings()">
-                    <option value="86400000">1 Dia</option>
-                    <option value="259200000">3 Dias</option>
-                    <option value="604800000">1 Semana</option>
-                </select>
-                <label><input type="checkbox" id="alarmActive" onchange="updateAlarmSettings()"> Alarme</label>
-            </div>
-        </div>
-
+        <h2 id="dayTitle" class="section-title">Cronograma</h2>
         <div id="grid" class="grid"></div>
     </div>
 
