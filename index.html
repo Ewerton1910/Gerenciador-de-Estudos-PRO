@@ -1,79 +1,119 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Gerenciador de Estudos PRO</title>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
-    
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
 
-<div id="uploadPanel">
-    <div class="upload-header">
+  </head>
+  <body>
+    <div id="uploadPanel">
+      <div class="upload-header">
         <span id="uploadStatusTitle">Enviando...</span>
-        <button onclick="document.getElementById('uploadPanel').style.display='none'" style="background:none; border:none; color:white; cursor:pointer;">✕</button>
+        <button
+          onclick="document.getElementById('uploadPanel').style.display='none'"
+          style="background: none; border: none; color: white; cursor: pointer"
+        >
+          ✕
+        </button>
+      </div>
+      <div class="upload-list" id="uploadList"></div>
     </div>
-    <div class="upload-list" id="uploadList"></div>
-</div>
 
-<div class="container">
-    <div class="dash-wrapper">
+    <div class="container">
+      <div class="dash-wrapper">
         <div class="dash-header">
-            <h3 style="margin:0">📊 Resumo de Matérias</h3>
-            <div class="alarm-config">
-                <span>⏰ Alarme:</span>
-                <select id="alarmInterval" onchange="updateAlarmSettings()">
-                    <option value="86400000">24 Horas</option>
-                    <option value="172800000">2 Dias</option>
-                    <option value="432000000">5 Dias</option>
-                    <option value="604800000">7 Dias</option>
-                </select>
-                <label><input type="checkbox" id="alarmActive" checked onchange="updateAlarmSettings()"> Ativo</label>
-            </div>
+          <h3 style="margin: 0">📊 Resumo de Matérias</h3>
+          <div class="alarm-config">
+            <span>⏰ Alarme:</span>
+            <select id="alarmInterval" onchange="updateAlarmSettings()">
+              <option value="86400000">24 Horas</option>
+              <option value="172800000">2 Dias</option>
+              <option value="432000000">5 Dias</option>
+              <option value="604800000">7 Dias</option>
+            </select>
+            <label
+              ><input
+                type="checkbox"
+                id="alarmActive"
+                checked
+                onchange="updateAlarmSettings()"
+              />
+              Ativo</label
+            >
+          </div>
         </div>
         <div id="dashboard" class="dashboard"></div>
-    </div>
+      </div>
 
-    <div class="nav-header">
+      <div class="nav-header">
         <h1>📚 Meus Estudos</h1>
         <div class="week-bar">
-            <button id="btn-day-0" class="day-btn" onclick="setDay(0)">Dom</button>
-            <button id="btn-day-1" class="day-btn" onclick="setDay(1)">Seg</button>
-            <button id="btn-day-2" class="day-btn" onclick="setDay(2)">Ter</button>
-            <button id="btn-day-3" class="day-btn" onclick="setDay(3)">Qua</button>
-            <button id="btn-day-4" class="day-btn" onclick="setDay(4)">Qui</button>
-            <button id="btn-day-5" class="day-btn" onclick="setDay(5)">Sex</button>
-            <button id="btn-day-6" class="day-btn" onclick="setDay(6)">Sáb</button>
-            <button class="day-btn" style="background:#eee" onclick="viewAll()">Ver Todas</button>
+          <button id="btn-day-0" class="day-btn" onclick="setDay(0)">
+            Dom
+          </button>
+          <button id="btn-day-1" class="day-btn" onclick="setDay(1)">
+            Seg
+          </button>
+          <button id="btn-day-2" class="day-btn" onclick="setDay(2)">
+            Ter
+          </button>
+          <button id="btn-day-3" class="day-btn" onclick="setDay(3)">
+            Qua
+          </button>
+          <button id="btn-day-4" class="day-btn" onclick="setDay(4)">
+            Qui
+          </button>
+          <button id="btn-day-5" class="day-btn" onclick="setDay(5)">
+            Sex
+          </button>
+          <button id="btn-day-6" class="day-btn" onclick="setDay(6)">
+            Sáb
+          </button>
+          <button class="day-btn" style="background: #eee" onclick="viewAll()">
+            Ver Todas
+          </button>
         </div>
+      </div>
+
+      <div class="controls">
+        <input
+          type="file"
+          id="fileInput"
+          accept="application/pdf"
+          multiple
+          style="flex: 1"
+        />
+        <button class="btn btn-blue" onclick="handleUpload()">
+          + Adicionar PDFs
+        </button>
+        <button class="btn btn-orange" onclick="autoDistribute()">
+          ⚡ Distribuir Automático
+        </button>
+      </div>
+
+      <h2 id="dayTitle">Carregando...</h2>
+      <div id="grid" class="grid"></div>
     </div>
 
-    <div class="controls">
-        <input type="file" id="fileInput" accept="application/pdf" multiple style="flex:1">
-        <button class="btn btn-blue" onclick="handleUpload()">+ Adicionar PDFs</button>
-        <button class="btn btn-orange" onclick="autoDistribute()">⚡ Distribuir Automático</button>
-    </div>
-
-    <h2 id="dayTitle">Carregando...</h2>
-    <div id="grid" class="grid"></div>
-</div>
-
-<div class="viewer" id="viewer">
-    <div class="viewer-header">
+    <div class="viewer" id="viewer">
+      <div class="viewer-header">
         <span id="pdfTitle">Arquivo</span>
-        <div style="display:flex; align-items:center; gap:20px;">
-            <span id="scrollPerc" style="color:var(--success); font-weight:bold;">0%</span>
-            <button onclick="closeAndSave()" class="btn btn-blue">Salvar e Sair</button>
+        <div style="display: flex; align-items: center; gap: 20px">
+          <span id="scrollPerc" style="color: var(--success); font-weight: bold"
+            >0%</span
+          >
+          <button onclick="closeAndSave()" class="btn btn-blue">
+            Salvar e Sair
+          </button>
         </div>
+      </div>
+      <div class="viewer-content" id="viewerContent"></div>
     </div>
-    <div class="viewer-content" id="viewerContent"></div>
-</div>
 
-<script src="script.js"></script>
-</body>
+
+  </body>
 </html>
