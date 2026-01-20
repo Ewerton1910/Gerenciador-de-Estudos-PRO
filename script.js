@@ -1,5 +1,5 @@
 /* -----------------------------------------------------------
-   CONFIGURAÇÕES E INICIALIZAÇÃO
+   CONFIGURAÇÕES INICIAIS (Cloudinary, Firebase e PDF.js)
    ----------------------------------------------------------- */
 const CLOUD_NAME = "dgagemtqg";
 const UPLOAD_PRESET = "Gerenciador_Estudos";
@@ -11,73 +11,73 @@ const firebaseConfig = {
     projectId: "gerenciador-de-estudos-9544b",
 };
 
-// Inicializa o Firebase e o Banco de Dados em tempo real
+// Inicializa o Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// Configura o "trabalhador" do PDF.js para processar os arquivos fora da thread principal
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+// Configura o worker do PDF.js para renderização em segundo plano
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
 
 /* -----------------------------------------------------------
-   ESTADO DA APLICAÇÃO (VARIÁVEIS GLOBAIS)
+   ESTADO GLOBAL DA APLICAÇÃO
    ----------------------------------------------------------- */
 let studyData = {
     folders: [],
-    settings: { alarmInterval: 86400000, alarmActive: true }, // Default: 24h em milissegundos
+    settings: { alarmInterval: 86400000, alarmActive: true },
 };
-let currentDay = new Date().getDay(); // Pega o dia atual (0-6)
-let mode = "daily"; // Define se estamos vendo o dia ("daily") ou tudo ("all")
-let activeFolderId = null; // ID da pasta aberta no momento
-let activeFile = null; // Arquivo PDF sendo lido no momento
+let currentDay = new Date().getDay(); // Dia atual (0-6)
+let mode = "daily";                   // Modos: 'daily' ou 'all'
+let activeFolderId = null;            // ID da matéria aberta
+let activeFile = null;                // Arquivo PDF em leitura
 const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
 /* -----------------------------------------------------------
-   SINCRONIZAÇÃO COM BANCO DE DATA (FIREBASE)
+   SINCRONIZAÇÃO COM BANCO DE DADOS (Realtime Database)
    ----------------------------------------------------------- */
-// Escuta qualquer mudança no banco e atualiza a tela automaticamente
+// Escuta mudanças no banco e atualiza a interface automaticamente
 db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
+        // Garante que as configurações existam
         if (!studyData.settings)
             studyData.settings = { alarmInterval: 86400000, alarmActive: true };
         
-        // Sincroniza os inputs de configuração da tela com os dados do banco
+        // Sincroniza os inputs do painel de controle
         document.getElementById("alarmInterval").value = studyData.settings.alarmInterval;
         document.getElementById("alarmActive").checked = studyData.settings.alarmActive;
     }
-    render(); // Reconstroi a interface com os novos dados
+    render();
 });
 
 /* -----------------------------------------------------------
-   FUNÇÕES DE CONFIGURAÇÃO E NAVEGAÇÃO
+   FUNÇÕES DE NAVEGAÇÃO E CONFIGURAÇÃO
    ----------------------------------------------------------- */
-// Salva as novas preferências de alarme no Firebase
+
+// Atualiza intervalo de revisão e estado do alarme
 function updateAlarmSettings() {
     studyData.settings.alarmInterval = parseInt(document.getElementById("alarmInterval").value);
     studyData.settings.alarmActive = document.getElementById("alarmActive").checked;
     db.ref("studyData").set(studyData);
 }
 
-// Altera o dia da semana visualizado
+// Muda o dia visualizado no cronograma
 function setDay(d) {
     currentDay = d;
     mode = "daily";
-    activeFolderId = null; // Fecha pastas abertas ao trocar de dia
+    activeFolderId = null;
     render();
 }
 
-// Muda para o modo de visualização de todas as matérias
+// Mostra todas as matérias cadastradas
 function viewAll() {
     mode = "all";
     activeFolderId = null;
     render();
 }
 
-/* -----------------------------------------------------------
-   GERENCIAMENTO DE CRONOGRAMA
-   ----------------------------------------------------------- */
-// Permite definir manualmente em quais dias (0-6) uma matéria aparece
+// Define manualmente quais dias uma matéria deve aparecer
 function manualSchedule(folderId) {
     const folder = studyData.folders.find((f) => f.id === folderId);
     const input = prompt(`Dias (0-6):`, folder.days.join(","));
@@ -90,7 +90,7 @@ function manualSchedule(folderId) {
     }
 }
 
-// Distribui as matérias automaticamente (uma para cada dia da semana)
+// Distribui as matérias automaticamente pela semana
 function autoDistribute() {
     if (studyData.folders.length === 0) return alert("Adicione matérias!");
     studyData.folders.forEach((folder, index) => {
@@ -100,9 +100,8 @@ function autoDistribute() {
 }
 
 /* -----------------------------------------------------------
-   UPLOAD E CLOUDINARY
+   UPLOAD DE ARQUIVOS (Cloudinary + Firebase)
    ----------------------------------------------------------- */
-// Gerencia o envio de arquivos para o Cloudinary e salva os links no Firebase
 async function handleUpload() {
     const fileInput = document.getElementById("fileInput");
     const files = fileInput.files;
@@ -116,11 +115,10 @@ async function handleUpload() {
 
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        // Cria o item visual na lista de upload
         const item = document.createElement("div");
         item.className = "upload-item";
         item.id = "up-" + i;
-        item.innerHTML = `<span>📄 ${file.name.substring(0, 12)}...</span><div class="spinner"></div>`;
+        item.innerHTML = `<span>📄 ${file.name.substring(0,12)}...</span><div class="spinner"></div>`;
         list.appendChild(item);
 
         try {
@@ -128,33 +126,29 @@ async function handleUpload() {
             formData.append("file", file);
             formData.append("upload_preset", UPLOAD_PRESET);
             
-            // Envia para a API do Cloudinary
+            // Upload para o Cloudinary
             const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, { 
                 method: "POST", body: formData 
             });
             const data = await resp.json();
 
             if (data.secure_url) {
-                // Procura se a pasta já existe ou cria uma nova
                 let folder = studyData.folders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
                 if (!folder) {
-                    folder = {
-                        id: "f" + Date.now(),
-                        name: folderName,
-                        files: [],
-                        days: [currentDay], // Adiciona ao dia que o usuário está vendo
-                    };
+                    folder = { id: "f" + Date.now(), name: folderName, files: [], days: [currentDay] };
                     studyData.folders.push(folder);
                 }
-                // Adiciona o novo arquivo com metadados de progresso e leitura
+                
+                // Adiciona metadados do arquivo
                 folder.files.push({
                     id: "d" + Date.now(),
                     name: file.name,
                     url: data.secure_url.replace("http://", "https://"),
                     progress: 0,
                     lastScroll: 0,
-                    lastRead: null,
+                    lastRead: null
                 });
+                
                 await db.ref("studyData").set(studyData);
                 document.getElementById("up-" + i).innerHTML = `<span>✅ Pronto</span>`;
             }
@@ -167,15 +161,14 @@ async function handleUpload() {
 }
 
 /* -----------------------------------------------------------
-   VISUALIZADOR DE PDF (PDF.js)
+   VISUALIZADOR DE PDF E CONTROLE DE PROGRESSO
    ----------------------------------------------------------- */
-// Abre o arquivo PDF, renderiza as páginas em Canvas e gerencia o scroll
 async function openPDF(folderId, fileId) {
     const folder = studyData.folders.find((f) => f.id === folderId);
     activeFile = folder.files.find((f) => f.id === fileId);
     activeFolderId = folderId;
     
-    // Marca a data da leitura (essencial para o sistema de revisão)
+    // Registra o momento da leitura para o sistema de revisão
     activeFile.lastRead = Date.now();
     db.ref("studyData").set(studyData);
 
@@ -186,8 +179,8 @@ async function openPDF(folderId, fileId) {
     try {
         const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
         content.innerHTML = "";
-        
-        // Loop para renderizar cada página do PDF
+
+        // Renderiza cada página do PDF em um elemento Canvas
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const viewport = page.getViewport({ scale: 1.3 });
@@ -199,76 +192,57 @@ async function openPDF(folderId, fileId) {
             await page.render({ canvasContext: context, viewport }).promise;
         }
 
-        // Monitora o progresso da leitura através do scroll
-       content.onscroll = () => {
+        // Monitora a rolagem para salvar o progresso
+        content.onscroll = () => {
             const totalH = content.scrollHeight - content.clientHeight;
+            if (totalH <= 0) return;
             const perc = Math.round((content.scrollTop / totalH) * 100);
-            
-            // Atualiza o texto na tela
             document.getElementById("scrollPerc").innerText = perc + "%";
             
-            // Atualiza os dados na memória do script
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
 
-            // --- NOVIDADE: SALVAMENTO AUTOMÁTICO ---
-            // Salva no Firebase a cada 10% de progresso para não sobrecarregar o banco
-            // e garante que se você fechar a aba de repente, o dado foi salvo.
+            // Salva no banco em "checkpoints" de 10% para garantir persistência no deploy
             if (perc % 10 === 0) {
-                db.ref("studyData").set(studyData);
+                db.ref("studyData").update(studyData);
             }
         };
 
-        // Retorna para onde o usuário parou na última vez
+        // Retorna o usuário para onde ele parou
         setTimeout(() => {
-            if (activeFile.lastScroll) {
-                content.scrollTop = activeFile.lastScroll;
-            }
+            content.scrollTop = activeFile.lastScroll || 0;
         }, 500);
+
     } catch (e) {
         console.error(e);
         alert("Erro ao abrir!");
     }
 }
 
-// Fecha o visualizador e salva o estado final no banco
-// Substitua a função antiga por esta:
+// Fecha o visualizador garantindo o salvamento final (Async para aguardar o Firebase)
 async function closeAndSave() {
     try {
-        // O 'await' faz o código esperar o Firebase confirmar o salvamento
         await db.ref("studyData").set(studyData);
-        
-        // Só depois que salvou, ele esconde o visualizador
         document.getElementById("viewer").style.display = "none";
-        
-        // Atualiza a tela para mostrar a barra de progresso nova
         render(); 
-        console.log("Progresso sincronizado com o Firebase.");
-    } catch (error) {
-        console.error("Erro ao salvar:", error);
-        alert("Atenção: O progresso não foi salvo. Verifique sua conexão.");
+    } catch (e) {
+        console.error("Erro ao salvar no fechamento:", e);
+        document.getElementById("viewer").style.display = "none";
     }
 }
+
 /* -----------------------------------------------------------
-   RENDERIZAÇÃO DA INTERFACE (A FUNÇÃO MAIS IMPORTANTE)
+   RENDERIZAÇÃO DA INTERFACE (HTML DINÂMICO)
    ----------------------------------------------------------- */
-// Reconstrói todo o HTML da página baseado no estado atual (studyData)
 function render() {
     const now = Date.now();
     const config = studyData.settings || { alarmInterval: 86400000, alarmActive: true };
 
-    // 1. Renderiza o Dashboard Superior (Cards Pequenos)
+    // 1. Renderiza o Dashboard superior
     const dashboard = document.getElementById("dashboard");
     dashboard.innerHTML = studyData.folders.map((f) => {
-        // Calcula a média de leitura da pasta
-        const avg = f.files.length 
-            ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) 
-            : 0;
-
-        // Verifica se algum arquivo precisa de revisão (tempo > intervalo)
-        const needsRevision = config.alarmActive && f.files.some(
-            file => file.lastRead && now - file.lastRead > config.alarmInterval
-        );
+        const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
+        const needsRevision = config.alarmActive && f.files.some(file => file.lastRead && now - file.lastRead > config.alarmInterval);
 
         return `
             <div class="dash-card">
@@ -279,7 +253,7 @@ function render() {
             </div>`;
     }).join("");
 
-    // 2. Atualiza os botões da barra da semana (Borda laranja e fundo azul)
+    // 2. Atualiza os botões de dias da semana
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
         if (btn) {
@@ -289,10 +263,10 @@ function render() {
         }
     }
 
-    // 3. Renderiza o Grid Principal (Pastas ou Arquivos)
+    // 3. Renderiza o Grid de matérias ou arquivos
     const grid = document.getElementById("grid");
     
-    // MODO: DENTRO DE UMA PASTA (Vendo os PDFs)
+    // VISÃO DE ARQUIVOS (Dentro de uma pasta)
     if (activeFolderId) {
         const folder = studyData.folders.find((f) => f.id === activeFolderId);
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
@@ -309,12 +283,9 @@ function render() {
                 </div>`;
             }).join("");
     } 
-    // MODO: VENDO AS PASTAS (Matérias)
+    // VISÃO DE PASTAS (Cronograma ou Todas)
     else {
-        let filtered = mode === "all" 
-            ? studyData.folders 
-            : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
-
+        let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
         document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
         
         grid.innerHTML = filtered.map((f) => {
@@ -341,16 +312,14 @@ function render() {
 /* -----------------------------------------------------------
    FUNÇÕES DE EXCLUSÃO
    ----------------------------------------------------------- */
-// Exclui uma pasta (matéria) inteira
 function deleteFolder(e, id) {
-    e.stopPropagation(); // Impede que o clique abra a pasta antes de excluir
-    if (confirm("Excluir Matéria e todos os arquivos?")) {
+    e.stopPropagation();
+    if (confirm("Deseja realmente excluir esta matéria?")) {
         studyData.folders = studyData.folders.filter((f) => f.id !== id);
         db.ref("studyData").set(studyData);
     }
 }
 
-// Exclui um arquivo PDF específico de dentro de uma pasta
 function deleteFile(e, fid, id) {
     e.stopPropagation();
     const folder = studyData.folders.find((f) => f.id === fid);
@@ -358,5 +327,5 @@ function deleteFile(e, fid, id) {
     db.ref("studyData").set(studyData);
 }
 
-// Inicia a renderização assim que a página carrega
+// Inicializa a interface ao carregar a página
 window.onload = () => render();
