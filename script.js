@@ -1,9 +1,5 @@
-/* -----------------------------------------------------------
-   CONFIGURAÇÕES E INICIALIZAÇÃO
-   ----------------------------------------------------------- */
 const CLOUD_NAME = "dgagemtqg";
 const UPLOAD_PRESET = "Gerenciador_Estudos";
-
 const firebaseConfig = {
     apiKey: "AIzaSyDtziafcFDXZd9sGndXleqijouEIcqBeIk",
     authDomain: "gerenciador-de-estudos-9544b.firebaseapp.com",
@@ -13,30 +9,20 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
 
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
-
-let studyData = {
-    folders: [],
-    settings: { alarmInterval: 86400000, alarmActive: true },
-};
+let studyData = { folders: [], settings: { alarmInterval: 86400000, alarmActive: true } };
 let currentDay = new Date().getDay();
 let mode = "daily";
 let activeFolderId = null;
 let activeFile = null;
 const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-/* -----------------------------------------------------------
-   SINCRONIZAÇÃO COM FIREBASE
-   ----------------------------------------------------------- */
 db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
-        if (!studyData.settings)
-            studyData.settings = { alarmInterval: 86400000, alarmActive: true };
-        
+        if (!studyData.settings) studyData.settings = { alarmInterval: 86400000, alarmActive: true };
         const intervalEl = document.getElementById("alarmInterval");
         const activeEl = document.getElementById("alarmActive");
         if(intervalEl) intervalEl.value = studyData.settings.alarmInterval;
@@ -46,29 +32,17 @@ db.ref("studyData").on("value", (snap) => {
 });
 
 async function saveAll() {
-    try {
-        await db.ref("studyData").set(studyData);
-    } catch (e) {
-        console.error("Erro ao salvar banco completo:", e);
-    }
+    try { await db.ref("studyData").set(studyData); } catch (e) { console.error(e); }
 }
 
-/* -----------------------------------------------------------
-   GERENCIAMENTO DE MATÉRIAS E CONFIGURAÇÕES
-   ----------------------------------------------------------- */
 function updateAlarmSettings() {
     studyData.settings.alarmInterval = parseInt(document.getElementById("alarmInterval").value);
     studyData.settings.alarmActive = document.getElementById("alarmActive").checked;
     saveAll();
 }
 
-function setDay(d) {
-    currentDay = d; mode = "daily"; activeFolderId = null; render();
-}
-
-function viewAll() {
-    mode = "all"; activeFolderId = null; render();
-}
+function setDay(d) { currentDay = d; mode = "daily"; activeFolderId = null; render(); }
+function viewAll() { mode = "all"; activeFolderId = null; render(); }
 
 function manualSchedule(folderId) {
     const folder = studyData.folders.find((f) => f.id === folderId);
@@ -85,9 +59,6 @@ function autoDistribute() {
     saveAll();
 }
 
-/* -----------------------------------------------------------
-   UPLOAD PARA CLOUDINARY
-   ----------------------------------------------------------- */
 async function handleUpload() {
     const fileInput = document.getElementById("fileInput");
     const files = fileInput.files;
@@ -95,7 +66,10 @@ async function handleUpload() {
     const folderName = prompt("Nome da Matéria:");
     if (!folderName) return;
 
-    document.getElementById("uploadPanel").style.display = "block";
+    // MOSTRA PAINEL FLUTUANTE
+    const panel = document.getElementById("uploadPanel");
+    panel.style.display = "block";
+    document.getElementById("uploadStatusTitle").innerText = "Enviando arquivos...";
     const list = document.getElementById("uploadList");
     list.innerHTML = "";
 
@@ -121,15 +95,10 @@ async function handleUpload() {
                     studyData.folders.push(folder);
                 }
                 folder.files.push({
-                    id: "d" + Date.now(),
-                    name: file.name,
-                    url: data.secure_url.replace("http://", "https://"),
-                    progress: 0,
-                    lastScroll: 0,
-                    lastRead: Date.now()
+                    id: "d" + Date.now(), name: file.name, url: data.secure_url.replace("http://", "https://"), progress: 0, lastScroll: 0, lastRead: Date.now()
                 });
                 await saveAll();
-                document.getElementById("up-" + i).innerHTML = `<span>✅ Pronto</span>`;
+                document.getElementById("up-" + i).innerHTML = `<span>📄 ${file.name.substring(0,12)}</span> ✅`;
             }
         } catch (e) {
             document.getElementById("up-" + i).innerHTML = `<span>❌ Erro</span>`;
@@ -139,9 +108,6 @@ async function handleUpload() {
     fileInput.value = "";
 }
 
-/* -----------------------------------------------------------
-   VISUALIZADOR E SALVAMENTO DE PROGRESSO
-   ----------------------------------------------------------- */
 async function openPDF(folderId, fileId) {
     const folderIndex = studyData.folders.findIndex((f) => f.id === folderId);
     const folder = studyData.folders[folderIndex];
@@ -151,15 +117,11 @@ async function openPDF(folderId, fileId) {
 
     document.getElementById("viewer").style.display = "flex";
     const content = document.getElementById("viewerContent");
-    content.innerHTML = "<h2>Carregando páginas...</h2>";
+    content.innerHTML = "<h2>Carregando...</h2>";
 
     try {
         const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
-        
-        if (pdf.numPages === 1 && activeFile.progress === 0) {
-            activeFile.progress = 100;
-        }
-
+        if (pdf.numPages === 1 && activeFile.progress === 0) activeFile.progress = 100;
         content.innerHTML = "";
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
@@ -167,8 +129,7 @@ async function openPDF(folderId, fileId) {
             const canvas = document.createElement("canvas");
             content.appendChild(canvas);
             const context = canvas.getContext("2d");
-            canvas.height = viewport.height;
-            canvas.width = viewport.width;
+            canvas.height = viewport.height; canvas.width = viewport.width;
             await page.render({ canvasContext: context, viewport }).promise;
         }
 
@@ -177,89 +138,59 @@ async function openPDF(folderId, fileId) {
             if (totalH <= 0) return;
             const perc = Math.round((content.scrollTop / totalH) * 100);
             document.getElementById("scrollPerc").innerText = perc + "%";
-            
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
 
             if (perc % 5 === 0) { 
                 db.ref(`studyData/folders/${folderIndex}/files/${fileIndex}`).update({
-                    progress: perc,
-                    lastScroll: content.scrollTop,
-                    lastRead: Date.now()
+                    progress: perc, lastScroll: content.scrollTop, lastRead: Date.now()
                 });
             }
         };
-
-        setTimeout(() => {
-            content.scrollTop = activeFile.lastScroll || 0;
-        }, 500);
-    } catch (e) {
-        alert("Erro ao abrir!");
-    }
+        setTimeout(() => { content.scrollTop = activeFile.lastScroll || 0; }, 500);
+    } catch (e) { alert("Erro ao abrir!"); }
 }
 
 async function closeAndSave() {
-    try {
-        await saveAll();
-        document.getElementById("viewer").style.display = "none";
-        render();
-    } catch (e) {
-        console.error("Erro ao fechar e salvar:", e);
-        document.getElementById("viewer").style.display = "none";
-    }
+    await saveAll();
+    document.getElementById("viewer").style.display = "none";
+    render();
 }
 
-/* -----------------------------------------------------------
-   RENDERIZAÇÃO DA INTERFACE
-   ----------------------------------------------------------- */
 function render() {
     const now = Date.now();
     const config = studyData.settings;
 
-    // Render Dashboard
     const dashboard = document.getElementById("dashboard");
     if(dashboard) {
         dashboard.innerHTML = studyData.folders.map((f) => {
             const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
-            return `<div class="dash-card">
-                <h4>📂 ${f.name}</h4>
-                <div class="dash-perc">${avg}%</div>
-                <div style="font-size:0.7em; color:#888;">Progresso</div>
-            </div>`;
+            return `<div class="dash-card"><h4>📂 ${f.name}</h4><div class="dash-perc">${avg}%</div></div>`;
         }).join("");
     }
 
-    // --- PARTE ALTERADA: UPDATE DAY BUTTONS ---
-    // Faz a varredura para pintar de verde os botões dos dias que possuem matérias
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
         if (btn) {
-            // Verifica se existe qualquer pasta que inclua este dia (i) no array folder.days
             const hasContent = studyData.folders.some(f => f.days && f.days.includes(i));
-            
-            // Adiciona a classe 'has-content' para as bordas verdes
             btn.classList.toggle("has-content", hasContent);
-            
-            // Mantém a indicação do dia selecionado
             btn.classList.toggle("active", i === currentDay && mode === "daily");
         }
     }
-    // ------------------------------------------
 
     const grid = document.getElementById("grid");
     if (activeFolderId) {
         const folder = studyData.folders.find((f) => f.id === activeFolderId);
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
-        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:15px">⬅ Voltar</button>` +
+        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1">⬅ Voltar</button>` +
             folder.files.map((file) => {
                 const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
-                return `
-                <div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
+                return `<div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
                     ${isLate ? '<div class="revisao-badge">REVISÃO</div>' : ""}
                     <button class="btn-del" onclick="deleteFile(event, '${folder.id}', '${file.id}')">×</button>
                     <h4>📄 ${file.name}</h4>
                     <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
-                    <small>${file.progress}% concluído</small>
+                    <small>${file.progress}%</small>
                 </div>`;
             }).join("");
     } else {
@@ -282,10 +213,7 @@ function render() {
 
 function deleteFolder(e, id) {
     e.stopPropagation();
-    if (confirm("Excluir?")) {
-        studyData.folders = studyData.folders.filter((f) => f.id !== id);
-        saveAll();
-    }
+    if (confirm("Excluir?")) { studyData.folders = studyData.folders.filter((f) => f.id !== id); saveAll(); }
 }
 
 function deleteFile(e, fid, id) {
