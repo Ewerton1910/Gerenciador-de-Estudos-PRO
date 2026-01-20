@@ -209,15 +209,42 @@ header {
     transition: width 0.3s;
 }
 
+/* Posicionamento do selo no rodapé do card de arquivo */
 .revisao-badge {
     background: var(--danger);
     color: white;
     font-size: 0.7em;
-    padding: 3px 8px;
+    padding: 2px 6px;
     border-radius: 4px;
+    font-weight: bold;
+    /* Alinhado à direita no rodapé */
+}
+
+/* Flexbox para alinhar porcentagem e selo na mesma linha */
+.card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 5px;
+}
+
+/* Alerta específico para as pastas da Visão Geral */
+.dash-card.revisao-folder {
+    border: 2px solid var(--danger);
+    position: relative;
+}
+
+.dash-card.revisao-folder::after {
+    content: "⚠️ REVISAR";
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: -10px;
+    right: 5px;
+    background: var(--danger);
+    color: white;
+    font-size: 0.6em;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-weight: bold;
 }
 
 .btn-del {
