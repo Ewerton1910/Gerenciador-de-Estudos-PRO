@@ -200,19 +200,33 @@ async function openPDF(folderId, fileId) {
         }
 
         // Monitora o progresso da leitura através do scroll
-        content.onscroll = () => {
+       content.onscroll = () => {
             const totalH = content.scrollHeight - content.clientHeight;
             const perc = Math.round((content.scrollTop / totalH) * 100);
+            
+            // Atualiza o texto na tela
             document.getElementById("scrollPerc").innerText = perc + "%";
+            
+            // Atualiza os dados na memória do script
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
+
+            // --- NOVIDADE: SALVAMENTO AUTOMÁTICO ---
+            // Salva no Firebase a cada 10% de progresso para não sobrecarregar o banco
+            // e garante que se você fechar a aba de repente, o dado foi salvo.
+            if (perc % 10 === 0) {
+                db.ref("studyData").set(studyData);
+            }
         };
 
         // Retorna para onde o usuário parou na última vez
         setTimeout(() => {
-            content.scrollTop = activeFile.lastScroll || 0;
+            if (activeFile.lastScroll) {
+                content.scrollTop = activeFile.lastScroll;
+            }
         }, 500);
     } catch (e) {
+        console.error(e);
         alert("Erro ao abrir!");
     }
 }
