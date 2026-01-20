@@ -218,12 +218,23 @@ async function openPDF(folderId, fileId) {
 }
 
 // Fecha o visualizador e salva o estado final no banco
-function closeAndSave() {
-    db.ref("studyData").set(studyData).then(() => {
+// Substitua a função antiga por esta:
+async function closeAndSave() {
+    try {
+        // O 'await' faz o código esperar o Firebase confirmar o salvamento
+        await db.ref("studyData").set(studyData);
+        
+        // Só depois que salvou, ele esconde o visualizador
         document.getElementById("viewer").style.display = "none";
-    });
+        
+        // Atualiza a tela para mostrar a barra de progresso nova
+        render(); 
+        console.log("Progresso sincronizado com o Firebase.");
+    } catch (error) {
+        console.error("Erro ao salvar:", error);
+        alert("Atenção: O progresso não foi salvo. Verifique sua conexão.");
+    }
 }
-
 /* -----------------------------------------------------------
    RENDERIZAÇÃO DA INTERFACE (A FUNÇÃO MAIS IMPORTANTE)
    ----------------------------------------------------------- */
