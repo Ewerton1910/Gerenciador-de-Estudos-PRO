@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "middleware.js": {
+      "runtime": "edge"
+    }
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "middlewarePath": "middleware",
+      "continue": true
+    }
+  ]
+}
