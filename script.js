@@ -45,7 +45,6 @@ db.ref("studyData").on("value", (snap) => {
     render();
 });
 
-// Função para salvar o estado completo (Usada em mudanças estruturais)
 async function saveAll() {
     try {
         await db.ref("studyData").set(studyData);
@@ -141,7 +140,7 @@ async function handleUpload() {
 }
 
 /* -----------------------------------------------------------
-   VISUALIZADOR E SALVAMENTO DE PROGRESSO (MÉTODO DIRETO)
+   VISUALIZADOR E SALVAMENTO DE PROGRESSO
    ----------------------------------------------------------- */
 async function openPDF(folderId, fileId) {
     const folderIndex = studyData.folders.findIndex((f) => f.id === folderId);
@@ -156,6 +155,12 @@ async function openPDF(folderId, fileId) {
 
     try {
         const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
+        
+        // Ajuste para PDFs de página única: se não tiver scroll, já pode marcar como visto
+        if (pdf.numPages === 1 && activeFile.progress === 0) {
+            activeFile.progress = 100;
+        }
+
         content.innerHTML = "";
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
@@ -168,19 +173,15 @@ async function openPDF(folderId, fileId) {
             await page.render({ canvasContext: context, viewport }).promise;
         }
 
-        // SALVAMENTO EM TEMPO REAL NO CAMINHO ESPECÍFICO
         content.onscroll = () => {
             const totalH = content.scrollHeight - content.clientHeight;
             if (totalH <= 0) return;
             const perc = Math.round((content.scrollTop / totalH) * 100);
             document.getElementById("scrollPerc").innerText = perc + "%";
             
-            // Atualiza localmente
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
 
-            // SALVA NO FIREBASE: Apenas o que mudou, no local exato
-            // Isso ignora bloqueios de "Tracking Prevention" por ser um pacote pequeno
             if (perc % 5 === 0) { 
                 db.ref(`studyData/folders/${folderIndex}/files/${fileIndex}`).update({
                     progress: perc,
@@ -198,11 +199,19 @@ async function openPDF(folderId, fileId) {
     }
 }
 
+// ALTERAÇÃO AQUI: Garante que a interface atualiza após fechar
 async function closeAndSave() {
-    // Força um salvamento final antes de fechar
-    await saveAll();
-    document.getElementById("viewer").style.display = "none";
-    render();
+    try {
+        // 1. Salva o estado atual no banco
+        await saveAll();
+        // 2. Fecha a tela
+        document.getElementById("viewer").style.display = "none";
+        // 3. Força a atualização visual dos cards e barras de progresso
+        render();
+    } catch (e) {
+        console.error("Erro ao fechar e salvar:", e);
+        document.getElementById("viewer").style.display = "none";
+    }
 }
 
 /* -----------------------------------------------------------
