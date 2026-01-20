@@ -156,7 +156,6 @@ async function openPDF(folderId, fileId) {
     try {
         const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
         
-        // Ajuste para PDFs de página única: se não tiver scroll, já pode marcar como visto
         if (pdf.numPages === 1 && activeFile.progress === 0) {
             activeFile.progress = 100;
         }
@@ -199,14 +198,10 @@ async function openPDF(folderId, fileId) {
     }
 }
 
-// ALTERAÇÃO AQUI: Garante que a interface atualiza após fechar
 async function closeAndSave() {
     try {
-        // 1. Salva o estado atual no banco
         await saveAll();
-        // 2. Fecha a tela
         document.getElementById("viewer").style.display = "none";
-        // 3. Força a atualização visual dos cards e barras de progresso
         render();
     } catch (e) {
         console.error("Erro ao fechar e salvar:", e);
@@ -221,6 +216,7 @@ function render() {
     const now = Date.now();
     const config = studyData.settings;
 
+    // Render Dashboard
     const dashboard = document.getElementById("dashboard");
     if(dashboard) {
         dashboard.innerHTML = studyData.folders.map((f) => {
@@ -228,15 +224,33 @@ function render() {
             return `<div class="dash-card">
                 <h4>📂 ${f.name}</h4>
                 <div class="dash-perc">${avg}%</div>
+                <div style="font-size:0.7em; color:#888;">Progresso</div>
             </div>`;
         }).join("");
     }
+
+    // --- PARTE ALTERADA: UPDATE DAY BUTTONS ---
+    // Faz a varredura para pintar de verde os botões dos dias que possuem matérias
+    for (let i = 0; i <= 6; i++) {
+        const btn = document.getElementById(`btn-day-${i}`);
+        if (btn) {
+            // Verifica se existe qualquer pasta que inclua este dia (i) no array folder.days
+            const hasContent = studyData.folders.some(f => f.days && f.days.includes(i));
+            
+            // Adiciona a classe 'has-content' para as bordas verdes
+            btn.classList.toggle("has-content", hasContent);
+            
+            // Mantém a indicação do dia selecionado
+            btn.classList.toggle("active", i === currentDay && mode === "daily");
+        }
+    }
+    // ------------------------------------------
 
     const grid = document.getElementById("grid");
     if (activeFolderId) {
         const folder = studyData.folders.find((f) => f.id === activeFolderId);
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
-        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1">⬅ Voltar</button>` +
+        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:15px">⬅ Voltar</button>` +
             folder.files.map((file) => {
                 const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
                 return `
