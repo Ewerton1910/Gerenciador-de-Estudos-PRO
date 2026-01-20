@@ -1,218 +1,323 @@
-/* Variáveis de cores globais */
-:root { 
-    --primary: #5c67f2; 
-    --success: #2ecc71; 
-    --bg: #f4f7f6; 
-    --dark: #2d3436; 
-    --accent: #e67e22; 
-    --alert: #e74c3c; 
+/* -----------------------------------------------------------
+   VARIÁVEIS DE CORES E CONFIGURAÇÕES GERAIS
+   ----------------------------------------------------------- */
+:root {
+  --primary: #5c67f2;
+  --success: #2ecc71;
+  --bg: #f4f7f6;
+  --dark: #2d3436;
+  --accent: #e67e22;
+  --alert: #e74c3c;
 }
 
-body { 
-    font-family: 'Segoe UI', sans-serif; 
-    background: var(--bg); 
-    margin: 0; 
-    padding: 10px; /* Reduzi para telas menores */
-    color: var(--dark); 
+body {
+  font-family: "Segoe UI", sans-serif;
+  background: var(--bg);
+  margin: 0;
+  padding: 10px; /* Reduzido para telas menores */
+  color: var(--dark);
+  -webkit-tap-highlight-color: transparent; /* Melhora toque no mobile */
 }
 
-.container { 
-    max-width: 1100px; 
-    margin: 0 auto; 
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
 }
 
-/* Dashboard Adaptável */
-.dash-wrapper { 
-    background: white; 
-    padding: 15px; 
-    border-radius: 15px; 
-    margin-bottom: 20px; 
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+/* -----------------------------------------------------------
+   DASHBOARD (RESUMO SUPERIOR)
+   ----------------------------------------------------------- */
+.dash-wrapper {
+  background: white;
+  padding: 15px;
+  border-radius: 15px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
 }
 
-.dash-header { 
-    display: flex; 
-    flex-direction: column; /* Coluna no mobile por padrão */
-    gap: 10px;
-    margin-bottom: 15px; 
-    border-bottom: 1px solid #eee; 
-    padding-bottom: 10px; 
+.dash-header {
+  display: flex;
+  flex-direction: column; /* Coluna no mobile */
+  gap: 10px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
 }
 
+/* Ajuste para telas maiores que 600px */
 @media (min-width: 600px) {
-    .dash-header { flex-direction: row; justify-content: space-between; align-items: center; }
+  .dash-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
 }
 
-.alarm-config { 
-    display: flex; 
-    gap: 8px; 
-    align-items: center; 
-    font-size: 0.8em; 
-    background: #f9f9f9; 
-    padding: 8px; 
-    border-radius: 10px; 
-    border: 1px solid #ddd;
-    width: fit-content;
+.alarm-config {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 0.85em;
+  background: #f9f9f9;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid #ddd;
+  width: fit-content;
 }
 
-.dashboard { 
-    display: flex; 
-    gap: 12px; 
-    overflow-x: auto; 
-    padding: 5px;
-    scrollbar-width: none; /* Esconde scroll no Firefox */
-}
-.dashboard::-webkit-scrollbar { display: none; } /* Esconde scroll no Chrome/Safari */
-
-.dash-card { 
-    min-width: 140px; 
-    background: white; 
-    padding: 12px; 
-    border-radius: 12px; 
-    border: 1px solid #eee; 
-    text-align: center; 
-    border-left: 5px solid var(--primary); 
-    position: relative; 
+.dashboard {
+  display: flex;
+  gap: 15px;
+  overflow-x: auto; /* Permite deslizar os cards no celular */
+  padding: 5px 5px 15px 5px;
+  scrollbar-width: thin; /* Scroll fino para Firefox */
 }
 
-/* Selo de Alerta */
-.revisao-badge { 
-    background: var(--alert); 
-    color: white; 
-    font-size: 9px; 
-    padding: 2px 6px; 
-    border-radius: 10px; 
-    position: absolute; 
-    top: -5px; 
-    right: -5px; 
-    font-weight: bold; 
-    animation: pulse 2s infinite; 
-    z-index: 10; 
+.dash-card {
+  min-width: 160px;
+  background: white;
+  padding: 15px;
+  border-radius: 12px;
+  border: 1px solid #eee;
+  text-align: center;
+  border-left: 5px solid var(--primary);
+  position: relative;
+  cursor: pointer; /* Adicionado para indicar clique */
 }
 
-@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-
-/* Cabeçalho e Navegação */
-.nav-header { margin-bottom: 20px; }
-.nav-header h1 { font-size: 1.5rem; margin-bottom: 15px; }
-
-.week-bar { 
-    display: flex; 
-    gap: 5px; 
-    overflow-x: auto; 
-    padding-bottom: 10px;
-    scrollbar-width: none;
+.dash-card h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.9em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.day-btn { 
-    padding: 10px 18px; /* Maior para toque */
-    border-radius: 8px; 
-    border: 1px solid #ddd; 
-    cursor: pointer; 
-    background: white; 
-    font-weight: bold; 
-    white-space: nowrap; /* Não quebra o nome do dia */
+.dash-perc {
+  font-size: 1.4em;
+  font-weight: bold;
+  color: var(--success);
 }
 
-.day-btn.active { background: var(--primary); color: white !important; }
+/* Badge de Revisão com Animação */
+.revisao-badge {
+  background: var(--alert);
+  color: white;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  font-weight: bold;
+  animation: pulse 2s infinite;
+  z-index: 10;
+}
 
-/* Controles de Ação */
-.controls { 
-    background: white; 
-    padding: 15px; 
-    border-radius: 15px; 
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05); 
-    margin-bottom: 25px; 
-    display: flex; 
-    flex-direction: column; /* Botões um embaixo do outro no mobile */
-    gap: 12px; 
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* -----------------------------------------------------------
+   NAVEGAÇÃO (DIAS DA SEMANA)
+   ----------------------------------------------------------- */
+.nav-header {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-bottom: 20px;
 }
 
 @media (min-width: 768px) {
-    .controls { flex-direction: row; }
+  .nav-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
 }
 
-.btn { 
-    padding: 12px; 
-    border-radius: 8px; 
-    border: none; 
-    cursor: pointer; 
-    font-weight: bold; 
-    font-size: 1rem; 
-    width: 100%; /* Botão largo no mobile */
+.week-bar {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto; /* Permite deslizar os dias no mobile */
+  padding-bottom: 5px;
+}
+
+.day-btn {
+  padding: 10px 15px; /* Maior área de toque */
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  cursor: pointer;
+  background: white;
+  font-weight: bold;
+  transition: 0.3s;
+  white-space: nowrap;
+}
+
+.day-btn.has-content {
+  border: 2px solid var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+.day-btn.active {
+  background: var(--primary);
+  color: white !important;
+  border-color: var(--primary) !important;
+}
+
+/* -----------------------------------------------------------
+   CONTROLES E INPUTS
+   ----------------------------------------------------------- */
+.controls {
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  margin-bottom: 25px;
+  display: flex;
+  flex-direction: column; /* Empilha no mobile */
+  gap: 15px;
 }
 
 @media (min-width: 768px) {
-    .btn { width: auto; }
+  .controls {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.btn {
+  padding: 12px 15px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+  transition: 0.3s;
+  font-size: 0.9em;
+  text-align: center;
 }
 
 .btn-blue { background: var(--primary); color: white; }
 .btn-orange { background: var(--accent); color: white; }
+.btn-outline { background: white; border: 1px solid #ddd; }
 
-/* Grid de Cards */
-.grid { 
-    display: grid; 
-    grid-template-columns: 1fr; /* 1 coluna no celular */
-    gap: 15px; 
-}
-
-@media (min-width: 650px) {
-    .grid { grid-template-columns: repeat(2, 1fr); } /* 2 colunas no tablet */
-}
-
-@media (min-width: 1000px) {
-    .grid { grid-template-columns: repeat(3, 1fr); } /* 3 colunas no PC */
-}
-
-.card { 
-    background: white; 
-    padding: 20px; 
-    border-radius: 15px; 
-    border: 1px solid #eee; 
-    position: relative; 
-}
-
-/* Visualizador de PDF Fullscreen */
-.viewer { 
-    position: fixed; 
-    top: 0; left: 0; width: 100%; height: 100%; 
-    background: #333; z-index: 10000; 
-    display: none; flex-direction: column; 
-}
-
-.viewer-header { 
-    background: #1a1a1a; color: white; 
-    padding: 10px; 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    gap: 10px;
+/* -----------------------------------------------------------
+   GRID DE MATÉRIAS E ARQUIVOS
+   ----------------------------------------------------------- */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr; /* 1 coluna por padrão no mobile */
+  gap: 20px;
 }
 
 @media (min-width: 600px) {
-    .viewer-header { flex-direction: row; justify-content: space-between; padding: 15px 25px; }
+  .grid { grid-template-columns: repeat(2, 1fr); } /* 2 colunas no tablet */
 }
 
-.viewer-content { 
-    flex: 1; overflow-y: auto; 
-    display: flex; flex-direction: column; 
-    align-items: center; 
-    padding: 10px; 
-    background: #525659; 
+@media (min-width: 1000px) {
+  .grid { grid-template-columns: repeat(3, 1fr); } /* 3 colunas no PC */
 }
 
-canvas { 
-    max-width: 100%; /* PDF não estoura a tela do celular */
-    height: auto !important; 
-    margin-bottom: 15px; 
-    box-shadow: 0 0 20px rgba(0,0,0,0.4); 
+.card {
+  background: white;
+  padding: 20px;
+  border-radius: 15px;
+  cursor: pointer;
+  border: 1px solid #eee;
+  position: relative;
+  transition: transform 0.2s;
 }
 
-/* Botão de Excluir */
-.btn-del { 
-    position: absolute; 
-    top: 8px; right: 8px; 
-    background: #fff1f1; color: #ff5c5c; 
-    padding: 5px 8px;
-    border-radius: 5px; 
+.card:hover {
+  transform: translateY(-3px);
+}
+
+.prog-container {
+  background: #eee;
+  height: 8px;
+  border-radius: 4px;
+  margin-top: 15px;
+  overflow: hidden;
+}
+
+.prog-bar {
+  background: var(--success);
+  height: 100%;
+  transition: 0.3s;
+}
+
+/* -----------------------------------------------------------
+   PAINEL DE UPLOAD (GOOGLE DRIVE STYLE)
+   ----------------------------------------------------------- */
+#uploadPanel {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  right: 20px; /* Ocupa largura total no mobile */
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  display: none;
+  z-index: 12000;
+  overflow: hidden;
+}
+
+@media (min-width: 600px) {
+  #uploadPanel {
+    left: auto;
+    width: 300px;
+  }
+}
+
+/* -----------------------------------------------------------
+   VISUALIZADOR DE PDF
+   ----------------------------------------------------------- */
+.viewer {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: #333;
+  z-index: 10000;
+  display: none;
+  flex-direction: column;
+}
+
+.viewer-header {
+  background: #1a1a1a;
+  color: white;
+  padding: 10px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.viewer-content {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  background: #525659;
+}
+
+canvas {
+  max-width: 100%; /* Ajusta PDF à largura da tela */
+  height: auto !important;
+  margin-bottom: 20px;
+  box-shadow: 0 0 25px rgba(0, 0, 0, 0.5);
+  background: white;
+}
+
+.btn-del {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 5px 8px;
+  background: #fff1f1;
+  color: #ff5c5c;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
 }
