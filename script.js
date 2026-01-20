@@ -18,14 +18,11 @@ let activeFolderId = null;
 let activeFile = null;
 const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-// ESCUTA FIREBASE - Mantendo a sincronização original
 db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
         if (!studyData.settings) studyData.settings = { alarmInterval: 86400000, alarmActive: true };
-        
-        // Sincroniza os inputs que agora estão no topo
         const intervalEl = document.getElementById("alarmInterval");
         const activeEl = document.getElementById("alarmActive");
         if(intervalEl) intervalEl.value = studyData.settings.alarmInterval;
@@ -166,8 +163,6 @@ async function openPDF(folderId, fileId) {
             if (totalH <= 0) return;
             const perc = Math.round((content.scrollTop / totalH) * 100);
             document.getElementById("scrollPerc").innerText = perc + "%";
-            
-            // VOLTANDO PARA A LÓGICA QUE VOCÊ VALIDOU: Atualiza variáveis locais
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
             activeFile.lastRead = Date.now();
@@ -181,7 +176,6 @@ async function openPDF(folderId, fileId) {
     }
 }
 
-// FUNÇÃO DE FECHAR - É aqui que o salvamento real acontece (como na sua versão funcional)
 async function closeAndSave() {
     await saveAll();
     document.getElementById("viewer").style.display = "none";
@@ -192,14 +186,25 @@ function render() {
     const now = Date.now();
     const config = studyData.settings;
 
+    // DASHBOARD (Visão Geral) com Alerta de Pasta
     const dashboard = document.getElementById("dashboard");
     if(dashboard) {
         dashboard.innerHTML = studyData.folders.map((f) => {
             const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
-            return `<div class="dash-card"><h4>📂 ${f.name}</h4><div class="dash-perc">${avg}%</div></div>`;
+            
+            // Verifica se qualquer arquivo nesta pasta precisa de revisão
+            const folderNeedsReview = f.files.some(file => 
+                config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval)
+            );
+
+            return `<div class="dash-card ${folderNeedsReview ? 'pasta-revisao' : ''}">
+                        <h4>📂 ${f.name}</h4>
+                        <div class="dash-perc">${avg}%</div>
+                    </div>`;
         }).join("");
     }
 
+    // BOTÕES DA SEMANA
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
         if (btn) {
@@ -211,25 +216,35 @@ function render() {
 
     const grid = document.getElementById("grid");
     if (activeFolderId) {
+        // VISÃO DA PASTA (Arquivos)
         const folder = studyData.folders.find((f) => f.id === activeFolderId);
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
         grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:15px">⬅ Voltar</button>` +
             folder.files.map((file) => {
                 const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
                 return `<div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
-                    ${isLate ? '<div class="revisao-badge">REVISÃO</div>' : ""}
                     <button class="btn-del" onclick="deleteFile(event, '${folder.id}', '${file.id}')">×</button>
                     <h4>📄 ${file.name}</h4>
                     <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
-                    <small>${file.progress}%</small>
+                    <div class="card-footer">
+                        <small>${file.progress}%</small>
+                        ${isLate ? '<span class="revisao-badge">REVISÃO</span>' : ""}
+                    </div>
                 </div>`;
             }).join("");
     } else {
+        // VISÃO DO CRONOGRAMA (Pastas)
         let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
         document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
         grid.innerHTML = filtered.map((f) => {
             const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
-            return `<div class="card" onclick="activeFolderId='${f.id}'; render()">
+            
+            // Verifica se a pasta precisa de revisão para marcar o card grande também
+            const folderNeedsReview = f.files.some(file => 
+                config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval)
+            );
+
+            return `<div class="card ${folderNeedsReview ? 'pasta-revisao' : ''}" onclick="activeFolderId='${f.id}'; render()">
                 <button class="btn-del" onclick="deleteFolder(event, '${f.id}')">×</button>
                 <h3>📂 ${f.name}</h3>
                 <div class="prog-container"><div class="prog-bar" style="width:${avg}%"></div></div>
