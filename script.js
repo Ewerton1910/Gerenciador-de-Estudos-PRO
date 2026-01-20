@@ -18,14 +18,14 @@ let activeFolderId = null;
 let activeFile = null;
 const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-// ESCUTA O FIREBASE EM TEMPO REAL
+// ESCUTA FIREBASE - Mantendo a sincronização original
 db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
         if (!studyData.settings) studyData.settings = { alarmInterval: 86400000, alarmActive: true };
         
-        // Sincroniza os elementos de UI com os dados do banco
+        // Sincroniza os inputs que agora estão no topo
         const intervalEl = document.getElementById("alarmInterval");
         const activeEl = document.getElementById("alarmActive");
         if(intervalEl) intervalEl.value = studyData.settings.alarmInterval;
@@ -166,25 +166,22 @@ async function openPDF(folderId, fileId) {
             if (totalH <= 0) return;
             const perc = Math.round((content.scrollTop / totalH) * 100);
             document.getElementById("scrollPerc").innerText = perc + "%";
+            
+            // VOLTANDO PARA A LÓGICA QUE VOCÊ VALIDOU: Atualiza variáveis locais
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
-
-            // Salva progresso no Firebase a cada 5% para economizar banda
-            if (perc % 5 === 0) { 
-                db.ref(`studyData/folders/${folderIndex}/files/${fileIndex}`).update({
-                    progress: perc,
-                    lastScroll: content.scrollTop,
-                    lastRead: Date.now()
-                });
-            }
+            activeFile.lastRead = Date.now();
         };
-        // Tempo de espera para o PDF desenhar as páginas
-        setTimeout(() => { content.scrollTop = activeFile.lastScroll || 0; }, 500);
+
+        setTimeout(() => { 
+            content.scrollTop = activeFile.lastScroll || 0; 
+        }, 500);
     } catch (e) {
         alert("Erro ao abrir PDF!");
     }
 }
 
+// FUNÇÃO DE FECHAR - É aqui que o salvamento real acontece (como na sua versão funcional)
 async function closeAndSave() {
     await saveAll();
     document.getElementById("viewer").style.display = "none";
@@ -195,7 +192,6 @@ function render() {
     const now = Date.now();
     const config = studyData.settings;
 
-    // Dashboard
     const dashboard = document.getElementById("dashboard");
     if(dashboard) {
         dashboard.innerHTML = studyData.folders.map((f) => {
@@ -204,7 +200,6 @@ function render() {
         }).join("");
     }
 
-    // Botões dos Dias
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
         if (btn) {
@@ -216,7 +211,6 @@ function render() {
 
     const grid = document.getElementById("grid");
     if (activeFolderId) {
-        // Renderiza arquivos de uma pasta específica
         const folder = studyData.folders.find((f) => f.id === activeFolderId);
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
         grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:15px">⬅ Voltar</button>` +
@@ -231,7 +225,6 @@ function render() {
                 </div>`;
             }).join("");
     } else {
-        // Renderiza lista de pastas do dia
         let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
         document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
         grid.innerHTML = filtered.map((f) => {
@@ -251,7 +244,7 @@ function render() {
 
 function deleteFolder(e, id) {
     e.stopPropagation();
-    if (confirm("Excluir pasta e arquivos?")) {
+    if (confirm("Excluir pasta?")) {
         studyData.folders = studyData.folders.filter((f) => f.id !== id);
         saveAll();
     }
