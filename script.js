@@ -18,11 +18,14 @@ let activeFolderId = null;
 let activeFile = null;
 const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+// ESCUTA O FIREBASE EM TEMPO REAL
 db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
         if (!studyData.settings) studyData.settings = { alarmInterval: 86400000, alarmActive: true };
+        
+        // Sincroniza os elementos de UI com os dados do banco
         const intervalEl = document.getElementById("alarmInterval");
         const activeEl = document.getElementById("alarmActive");
         if(intervalEl) intervalEl.value = studyData.settings.alarmInterval;
@@ -32,7 +35,11 @@ db.ref("studyData").on("value", (snap) => {
 });
 
 async function saveAll() {
-    try { await db.ref("studyData").set(studyData); } catch (e) { console.error(e); }
+    try {
+        await db.ref("studyData").set(studyData);
+    } catch (e) {
+        console.error("Erro ao salvar:", e);
+    }
 }
 
 function updateAlarmSettings() {
@@ -41,8 +48,18 @@ function updateAlarmSettings() {
     saveAll();
 }
 
-function setDay(d) { currentDay = d; mode = "daily"; activeFolderId = null; render(); }
-function viewAll() { mode = "all"; activeFolderId = null; render(); }
+function setDay(d) {
+    currentDay = d;
+    mode = "daily";
+    activeFolderId = null;
+    render();
+}
+
+function viewAll() {
+    mode = "all";
+    activeFolderId = null;
+    render();
+}
 
 function manualSchedule(folderId) {
     const folder = studyData.folders.find((f) => f.id === folderId);
@@ -55,7 +72,9 @@ function manualSchedule(folderId) {
 
 function autoDistribute() {
     if (studyData.folders.length === 0) return alert("Adicione matérias!");
-    studyData.folders.forEach((folder, index) => { folder.days = [index % 7]; });
+    studyData.folders.forEach((folder, index) => {
+        folder.days = [index % 7];
+    });
     saveAll();
 }
 
@@ -66,7 +85,6 @@ async function handleUpload() {
     const folderName = prompt("Nome da Matéria:");
     if (!folderName) return;
 
-    // MOSTRA PAINEL FLUTUANTE
     const panel = document.getElementById("uploadPanel");
     panel.style.display = "block";
     document.getElementById("uploadStatusTitle").innerText = "Enviando arquivos...";
@@ -85,7 +103,10 @@ async function handleUpload() {
             const formData = new FormData();
             formData.append("file", file);
             formData.append("upload_preset", UPLOAD_PRESET);
-            const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, { method: "POST", body: formData });
+            const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, { 
+                method: "POST", 
+                body: formData 
+            });
             const data = await resp.json();
 
             if (data.secure_url) {
@@ -95,7 +116,12 @@ async function handleUpload() {
                     studyData.folders.push(folder);
                 }
                 folder.files.push({
-                    id: "d" + Date.now(), name: file.name, url: data.secure_url.replace("http://", "https://"), progress: 0, lastScroll: 0, lastRead: Date.now()
+                    id: "d" + Date.now(),
+                    name: file.name,
+                    url: data.secure_url.replace("http://", "https://"),
+                    progress: 0,
+                    lastScroll: 0,
+                    lastRead: Date.now()
                 });
                 await saveAll();
                 document.getElementById("up-" + i).innerHTML = `<span>📄 ${file.name.substring(0,12)}</span> ✅`;
@@ -123,13 +149,15 @@ async function openPDF(folderId, fileId) {
         const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
         if (pdf.numPages === 1 && activeFile.progress === 0) activeFile.progress = 100;
         content.innerHTML = "";
+        
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
             const viewport = page.getViewport({ scale: 1.3 });
             const canvas = document.createElement("canvas");
             content.appendChild(canvas);
             const context = canvas.getContext("2d");
-            canvas.height = viewport.height; canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
             await page.render({ canvasContext: context, viewport }).promise;
         }
 
@@ -141,14 +169,20 @@ async function openPDF(folderId, fileId) {
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
 
+            // Salva progresso no Firebase a cada 5% para economizar banda
             if (perc % 5 === 0) { 
                 db.ref(`studyData/folders/${folderIndex}/files/${fileIndex}`).update({
-                    progress: perc, lastScroll: content.scrollTop, lastRead: Date.now()
+                    progress: perc,
+                    lastScroll: content.scrollTop,
+                    lastRead: Date.now()
                 });
             }
         };
+        // Tempo de espera para o PDF desenhar as páginas
         setTimeout(() => { content.scrollTop = activeFile.lastScroll || 0; }, 500);
-    } catch (e) { alert("Erro ao abrir!"); }
+    } catch (e) {
+        alert("Erro ao abrir PDF!");
+    }
 }
 
 async function closeAndSave() {
@@ -161,6 +195,7 @@ function render() {
     const now = Date.now();
     const config = studyData.settings;
 
+    // Dashboard
     const dashboard = document.getElementById("dashboard");
     if(dashboard) {
         dashboard.innerHTML = studyData.folders.map((f) => {
@@ -169,6 +204,7 @@ function render() {
         }).join("");
     }
 
+    // Botões dos Dias
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
         if (btn) {
@@ -180,9 +216,10 @@ function render() {
 
     const grid = document.getElementById("grid");
     if (activeFolderId) {
+        // Renderiza arquivos de uma pasta específica
         const folder = studyData.folders.find((f) => f.id === activeFolderId);
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
-        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1">⬅ Voltar</button>` +
+        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:15px">⬅ Voltar</button>` +
             folder.files.map((file) => {
                 const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
                 return `<div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
@@ -194,6 +231,7 @@ function render() {
                 </div>`;
             }).join("");
     } else {
+        // Renderiza lista de pastas do dia
         let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
         document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
         grid.innerHTML = filtered.map((f) => {
@@ -213,7 +251,10 @@ function render() {
 
 function deleteFolder(e, id) {
     e.stopPropagation();
-    if (confirm("Excluir?")) { studyData.folders = studyData.folders.filter((f) => f.id !== id); saveAll(); }
+    if (confirm("Excluir pasta e arquivos?")) {
+        studyData.folders = studyData.folders.filter((f) => f.id !== id);
+        saveAll();
+    }
 }
 
 function deleteFile(e, fid, id) {
