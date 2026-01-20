@@ -1,6 +1,9 @@
-// Configurações
+/* -----------------------------------------------------------
+   CONFIGURAÇÕES E INICIALIZAÇÃO
+   ----------------------------------------------------------- */
 const CLOUD_NAME = "dgagemtqg";
 const UPLOAD_PRESET = "Gerenciador_Estudos";
+
 const firebaseConfig = {
     apiKey: "AIzaSyDtziafcFDXZd9sGndXleqijouEIcqBeIk",
     authDomain: "gerenciador-de-estudos-9544b.firebaseapp.com",
@@ -8,44 +11,56 @@ const firebaseConfig = {
     projectId: "gerenciador-de-estudos-9544b",
 };
 
-// Inicialização
 firebase.initializeApp(firebaseConfig);
-firebase.database().goOnline();
 const db = firebase.database();
-pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
 
-let studyData = { folders: [], settings: { alarmInterval: 86400000, alarmActive: true } };
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+
+let studyData = {
+    folders: [],
+    settings: { alarmInterval: 86400000, alarmActive: true },
+};
 let currentDay = new Date().getDay();
 let mode = "daily";
 let activeFolderId = null;
 let activeFile = null;
 const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-// Carregamento Inicial
+/* -----------------------------------------------------------
+   SINCRONIZAÇÃO COM FIREBASE
+   ----------------------------------------------------------- */
 db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
-        if (!studyData.settings) studyData.settings = { alarmInterval: 86400000, alarmActive: true };
-        document.getElementById("alarmInterval").value = studyData.settings.alarmInterval;
-        document.getElementById("alarmActive").checked = studyData.settings.alarmActive;
-        render();
+        if (!studyData.settings)
+            studyData.settings = { alarmInterval: 86400000, alarmActive: true };
+        
+        const intervalEl = document.getElementById("alarmInterval");
+        const activeEl = document.getElementById("alarmActive");
+        if(intervalEl) intervalEl.value = studyData.settings.alarmInterval;
+        if(activeEl) activeEl.checked = studyData.settings.alarmActive;
     }
+    render();
 });
 
-// Função centralizada para salvar no Firebase (Evita perdas no Deploy)
-async function updateFirebase() {
+// Função para salvar o estado completo (Usada em mudanças estruturais)
+async function saveAll() {
     try {
         await db.ref("studyData").set(studyData);
     } catch (e) {
-        console.error("Erro ao sincronizar Firebase:", e);
+        console.error("Erro ao salvar banco completo:", e);
     }
 }
 
+/* -----------------------------------------------------------
+   GERENCIAMENTO DE MATÉRIAS E CONFIGURAÇÕES
+   ----------------------------------------------------------- */
 function updateAlarmSettings() {
     studyData.settings.alarmInterval = parseInt(document.getElementById("alarmInterval").value);
     studyData.settings.alarmActive = document.getElementById("alarmActive").checked;
-    updateFirebase();
+    saveAll();
 }
 
 function setDay(d) {
@@ -57,20 +72,23 @@ function viewAll() {
 }
 
 function manualSchedule(folderId) {
-    const folder = studyData.folders.find(f => f.id === folderId);
+    const folder = studyData.folders.find((f) => f.id === folderId);
     const input = prompt(`Dias (0-6):`, folder.days.join(","));
     if (input !== null) {
-        folder.days = input.split(",").map(n => parseInt(n.trim())).filter(n => !isNaN(n));
-        updateFirebase();
+        folder.days = input.split(",").map((n) => parseInt(n.trim())).filter((n) => !isNaN(n));
+        saveAll();
     }
 }
 
 function autoDistribute() {
     if (studyData.folders.length === 0) return alert("Adicione matérias!");
-    studyData.folders.forEach((f, i) => f.days = [i % 7]);
-    updateFirebase();
+    studyData.folders.forEach((folder, index) => { folder.days = [index % 7]; });
+    saveAll();
 }
 
+/* -----------------------------------------------------------
+   UPLOAD PARA CLOUDINARY
+   ----------------------------------------------------------- */
 async function handleUpload() {
     const fileInput = document.getElementById("fileInput");
     const files = fileInput.files;
@@ -87,7 +105,7 @@ async function handleUpload() {
         const item = document.createElement("div");
         item.className = "upload-item";
         item.id = "up-" + i;
-        item.innerHTML = `<span>📄 ${file.name.substring(0,10)}...</span><div class="spinner"></div>`;
+        item.innerHTML = `<span>📄 ${file.name.substring(0,12)}...</span><div class="spinner"></div>`;
         list.appendChild(item);
 
         try {
@@ -107,9 +125,11 @@ async function handleUpload() {
                     id: "d" + Date.now(),
                     name: file.name,
                     url: data.secure_url.replace("http://", "https://"),
-                    progress: 0, lastScroll: 0, lastRead: null
+                    progress: 0,
+                    lastScroll: 0,
+                    lastRead: Date.now()
                 });
-                await updateFirebase();
+                await saveAll();
                 document.getElementById("up-" + i).innerHTML = `<span>✅ Pronto</span>`;
             }
         } catch (e) {
@@ -120,16 +140,19 @@ async function handleUpload() {
     fileInput.value = "";
 }
 
+/* -----------------------------------------------------------
+   VISUALIZADOR E SALVAMENTO DE PROGRESSO (MÉTODO DIRETO)
+   ----------------------------------------------------------- */
 async function openPDF(folderId, fileId) {
-    const folder = studyData.folders.find(f => f.id === folderId);
-    activeFile = folder.files.find(f => f.id === fileId);
+    const folderIndex = studyData.folders.findIndex((f) => f.id === folderId);
+    const folder = studyData.folders[folderIndex];
+    const fileIndex = folder.files.findIndex((f) => f.id === fileId);
+    activeFile = folder.files[fileIndex];
     activeFolderId = folderId;
-    activeFile.lastRead = Date.now();
-    updateFirebase();
 
     document.getElementById("viewer").style.display = "flex";
     const content = document.getElementById("viewerContent");
-    content.innerHTML = "<h2>Carregando PDF...</h2>";
+    content.innerHTML = "<h2>Carregando páginas...</h2>";
 
     try {
         const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
@@ -145,80 +168,89 @@ async function openPDF(folderId, fileId) {
             await page.render({ canvasContext: context, viewport }).promise;
         }
 
+        // SALVAMENTO EM TEMPO REAL NO CAMINHO ESPECÍFICO
         content.onscroll = () => {
             const totalH = content.scrollHeight - content.clientHeight;
+            if (totalH <= 0) return;
             const perc = Math.round((content.scrollTop / totalH) * 100);
             document.getElementById("scrollPerc").innerText = perc + "%";
+            
+            // Atualiza localmente
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
-            
-            // Salva no Firebase a cada 10% de rolagem (Garante o progresso no deploy)
-            if (perc % 10 === 0) updateFirebase();
+
+            // SALVA NO FIREBASE: Apenas o que mudou, no local exato
+            // Isso ignora bloqueios de "Tracking Prevention" por ser um pacote pequeno
+            if (perc % 5 === 0) { 
+                db.ref(`studyData/folders/${folderIndex}/files/${fileIndex}`).update({
+                    progress: perc,
+                    lastScroll: content.scrollTop,
+                    lastRead: Date.now()
+                });
+            }
         };
 
-        setTimeout(() => { content.scrollTop = activeFile.lastScroll || 0; }, 500);
-    } catch (e) { alert("Erro ao abrir PDF!"); }
+        setTimeout(() => {
+            content.scrollTop = activeFile.lastScroll || 0;
+        }, 500);
+    } catch (e) {
+        alert("Erro ao abrir!");
+    }
 }
 
 async function closeAndSave() {
-    await updateFirebase();
+    // Força um salvamento final antes de fechar
+    await saveAll();
     document.getElementById("viewer").style.display = "none";
     render();
 }
 
+/* -----------------------------------------------------------
+   RENDERIZAÇÃO DA INTERFACE
+   ----------------------------------------------------------- */
 function render() {
     const now = Date.now();
     const config = studyData.settings;
-    
-    // Render Dashboard
-    const dashboard = document.getElementById("dashboard");
-    dashboard.innerHTML = studyData.folders.map(f => {
-        const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
-        const needsRev = config.alarmActive && f.files.some(file => file.lastRead && now - file.lastRead > config.alarmInterval);
-        return `<div class="dash-card">
-            ${needsRev ? '<div class="revisao-badge">REVISAR</div>' : ''}
-            <h4>${f.name}</h4>
-            <div class="dash-perc">${avg}%</div>
-        </div>`;
-    }).join("");
 
-    // Update Day Buttons
-    for (let i = 0; i <= 6; i++) {
-        const btn = document.getElementById(`btn-day-${i}`);
-        if (btn) {
-            btn.classList.toggle("active", i === currentDay && mode === "daily");
-            btn.classList.toggle("has-content", studyData.folders.some(f => f.days?.includes(i)));
-        }
+    const dashboard = document.getElementById("dashboard");
+    if(dashboard) {
+        dashboard.innerHTML = studyData.folders.map((f) => {
+            const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
+            return `<div class="dash-card">
+                <h4>📂 ${f.name}</h4>
+                <div class="dash-perc">${avg}%</div>
+            </div>`;
+        }).join("");
     }
 
-    // Render Grid
     const grid = document.getElementById("grid");
     if (activeFolderId) {
-        const folder = studyData.folders.find(f => f.id === activeFolderId);
+        const folder = studyData.folders.find((f) => f.id === activeFolderId);
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
-        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn-back">⬅ Voltar</button>` +
-            folder.files.map(file => {
-                const late = config.alarmActive && file.lastRead && now - file.lastRead > config.alarmInterval;
-                return `<div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
-                    ${late ? '<div class="revisao-badge">REVISÃO</div>' : ''}
+        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1">⬅ Voltar</button>` +
+            folder.files.map((file) => {
+                const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
+                return `
+                <div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
+                    ${isLate ? '<div class="revisao-badge">REVISÃO</div>' : ""}
                     <button class="btn-del" onclick="deleteFile(event, '${folder.id}', '${file.id}')">×</button>
-                    <h4>${file.name}</h4>
+                    <h4>📄 ${file.name}</h4>
                     <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
                     <small>${file.progress}% concluído</small>
                 </div>`;
             }).join("");
     } else {
-        let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days?.includes(currentDay));
+        let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
         document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
-        grid.innerHTML = filtered.map(f => {
+        grid.innerHTML = filtered.map((f) => {
             const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
             return `<div class="card" onclick="activeFolderId='${f.id}'; render()">
                 <button class="btn-del" onclick="deleteFolder(event, '${f.id}')">×</button>
                 <h3>📂 ${f.name}</h3>
                 <div class="prog-container"><div class="prog-bar" style="width:${avg}%"></div></div>
-                <div class="card-footer">
-                    <small>${f.files.length} PDFs • ${avg}%</small>
-                    <button class="btn-setup" onclick="event.stopPropagation(); manualSchedule('${f.id}')">⚙️ Dias</button>
+                <div style="display:flex; justify-content:space-between; align-items:center">
+                   <small>${f.files.length} PDFs • ${avg}%</small>
+                   <button class="btn" style="padding:5px" onclick="event.stopPropagation(); manualSchedule('${f.id}')">⚙️</button>
                 </div>
             </div>`;
         }).join("");
@@ -227,17 +259,17 @@ function render() {
 
 function deleteFolder(e, id) {
     e.stopPropagation();
-    if (confirm("Excluir Matéria?")) {
-        studyData.folders = studyData.folders.filter(f => f.id !== id);
-        updateFirebase();
+    if (confirm("Excluir?")) {
+        studyData.folders = studyData.folders.filter((f) => f.id !== id);
+        saveAll();
     }
 }
 
 function deleteFile(e, fid, id) {
     e.stopPropagation();
-    const folder = studyData.folders.find(f => f.id === fid);
-    folder.files = folder.files.filter(f => f.id !== id);
-    updateFirebase();
+    const folder = studyData.folders.find((f) => f.id === fid);
+    folder.files = folder.files.filter((f) => f.id !== id);
+    saveAll();
 }
 
 window.onload = () => render();
