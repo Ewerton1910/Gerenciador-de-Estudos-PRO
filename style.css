@@ -25,91 +25,7 @@ header {
     gap: 15px;
 }
 
-.settings-top {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 8px 15px;
-    border-radius: 8px;
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    font-size: 0.85em;
-}
-
-.settings-top select {
-    background: #fff;
-    border: none;
-    border-radius: 4px;
-    padding: 2px 5px;
-    cursor: pointer;
-}
-
-.controls {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    background: var(--primary);
-    color: white;
-    font-weight: bold;
-    transition: 0.3s;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-}
-
-.btn-outline {
-    background-color: chocolate;
-    border: 1px solid white;
-}
-
-.btn:hover { opacity: 0.9; }
-
-/* PAINEL DE UPLOAD FLUTUANTE */
-.upload-floating {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 320px;
-    background: white;
-    border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    z-index: 3000;
-    border: 1px solid #ddd;
-    overflow: hidden;
-}
-
-/* DASHBOARD */
-.dashboard-container {
-    max-width: 1200px;
-    margin: 20px auto;
-    padding: 0 20px;
-}
-
-.dashboard-grid {
-    padding-top: 25px;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-    gap: 15px;
-}
-
-.dash-card {
-    background: white;
-    padding: 20px;
-    border-radius: 10px;
-    text-align: center;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    transition: transform 0.2s;
-}
-
-/* SEMANA */
+/* BOTÕES DA SEMANA E MARCAÇÃO DE CONTEÚDO */
 .week-bar {
     display: flex;
     justify-content: center;
@@ -117,9 +33,7 @@ header {
     margin: 25px 0;
     overflow-x: auto;
     padding: 10px;
-    scrollbar-width: none;
 }
-.week-bar::-webkit-scrollbar { display: none; }
 
 .day-btn {
     padding: 10px 18px;
@@ -129,12 +43,18 @@ header {
     cursor: pointer;
     transition: 0.3s;
     white-space: nowrap;
+    position: relative;
 }
 
 .day-btn.active {
     background: var(--primary);
     color: white;
     border-color: var(--primary);
+}
+
+/* Restaura a borda verde para dias com conteúdo */
+.day-btn.has-content {
+    border-bottom: 4px solid var(--success) !important;
 }
 
 /* GRID E CARDS */
@@ -157,16 +77,75 @@ header {
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
     position: relative;
     transition: 0.2s;
+    display: flex;
+    flex-direction: column;
 }
 
-/* O BOTÃO DA CATRACA (AJUSTADO) */
-.card .btn-acao {
-    width: auto; /* Não ocupa tudo no PC */
-    min-width: 120px;
+/* CORREÇÃO DO BOTÃO DE FECHAR (X) */
+.btn-del {
+    position: absolute;
+    top: 10px;
+    right: 10px; /* Mantém no canto superior direito */
+    background: #f1f1f1; /* Fundo leve para visibilidade */
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 1.2em;
+    z-index: 10;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.3s;
+}
+
+.btn-del:hover {
+    background: var(--danger);
+    color: white;
+}
+
+/* AJUSTE DO BOTÃO DA CATRACA (ACÃO) */
+.card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 15px;
-    padding: 8px 20px;
+    gap: 10px;
 }
 
+.btn-acao {
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 8px 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.3s;
+    flex: 1; /* Ocupa espaço disponível no notebook sem exagerar */
+    max-width: 200px; /* Limita o tamanho em telas grandes */
+}
+
+/* --- RESPONSIVIDADE --- */
+@media (max-width: 768px) {
+    .header-main { flex-direction: column; text-align: center; }
+    
+    .grid { grid-template-columns: 1fr; }
+
+    /* No mobile, o botão de ação pode ser maior para facilitar o toque */
+    .btn-acao {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    .week-bar { justify-content: flex-start; }
+}
+
+/* Outros estilos originais mantidos abaixo */
 .prog-container {
     background: #eee;
     height: 8px;
@@ -181,59 +160,11 @@ header {
     transition: width 0.3s;
 }
 
-/* --- RESPONSIVIDADE PROFISSIONAL --- */
-
-/* Tablet e Telas Médias (Notebook com tela dividida) */
-@media (max-width: 1024px) {
-    .grid {
-        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    }
-}
-
-/* Celular e Telas Pequenas */
-@media (max-width: 768px) {
-    header { padding: 15px; }
-
-    .header-main {
-        flex-direction: column;
-        text-align: center;
-    }
-
-    /* Botão da catraca vira 100% apenas no celular */
-    .card .btn-acao {
-        width: 100%;
-    }
-
-    .dashboard-grid {
-        grid-template-columns: 1fr 1fr; /* 2 colunas no mobile */
-    }
-
-    .grid {
-        grid-template-columns: 1fr; /* Cards inteiros no mobile */
-    }
-
-    .controls {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        width: 100%;
-    }
-
-    .upload-floating {
-        width: 90%;
-        left: 5%;
-        right: 5%;
-    }
-}
-
-/* Celulares muito pequenos */
-@media (max-width: 480px) {
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-    }
-    .controls {
-        grid-template-columns: 1fr;
-    }
-    .week-bar {
-        justify-content: flex-start;
-    }
+.revisao-badge {
+    background: var(--danger);
+    color: white;
+    font-size: 0.75em;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: bold;
 }
