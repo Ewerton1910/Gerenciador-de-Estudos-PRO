@@ -1,77 +1,61 @@
-/* style.css - COMPLETO E ATUALIZADO */
-
-:root {
-    --primary: #4a90e2;
-    --secondary: #2c3e50;
-    --danger: #ff4757;
-    --success: #2ed573;
-    --bg: #f4f7f6;
+/* AJUSTES PARA RECUPERAR O LAYOUT DO HTML */
+.nav {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px 0;
+    flex-wrap: wrap;
 }
 
-/* RESET GERAL */
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
-
-body { background-color: var(--bg); color: var(--secondary); padding-bottom: 50px; }
-
-header { background: var(--secondary); color: white; padding: 20px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-
-/* GRID PRINCIPAL */
-.main-container { max-width: 1200px; margin: 20px auto; padding: 0 20px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
-
-/* CARDS */
-.card {
+.nav button, .day-btn {
+    padding: 8px 15px;
+    border: 1px solid #ddd;
     background: white;
-    padding: 20px;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    position: relative;
+    border-radius: 20px;
     cursor: pointer;
-    transition: 0.2s;
-    border: 2px solid transparent; /* Essencial para a borda não 'pular' quando aparecer */
-}
-
-/* =================================IMAGE_LOGIC================================= */
-/* 1. VISUAL DA PASTA COM REVISÃO (BORDA VERMELHA) */
-.card.revisar-pasta {
-    border: 2px solid var(--danger) !important;
-}
-
-/* 2. SELO "REVISAR" NO TOPO DA PASTA */
-.revisar-label-top {
-    background: var(--danger);
-    color: white;
-    font-size: 10px;
     font-weight: bold;
-    padding: 2px 10px;
-    border-radius: 4px;
-    position: absolute;
-    top: -10px; 
-    left: 50%;
-    transform: translateX(-50%);
-    text-transform: uppercase;
-    z-index: 10;
+    transition: 0.3s;
 }
 
-/* 3. BADGE DE REVISÃO NO ARQUIVO (PARTE DE BAIXO) */
-.card-footer {
+.nav button.active, .day-btn.active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.upload-section {
+    text-align: center;
+    margin: 30px 0;
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.btn-upload {
+    padding: 10px 20px;
+    background: var(--secondary);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+/* Estilo do Visualizador de PDF */
+.viewer {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.95);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+}
+
+.viewer-header {
+    background: #1a1a1a;
+    color: white;
+    padding: 15px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-top: 10px;
 }
-
-.revisao-badge-bottom {
-    background: var(--danger);
-    color: white;
-    font-size: 11px;
-    padding: 3px 10px;
-    border-radius: 5px;
-    font-weight: bold;
-}
-/* ============================================================================= */
-
-.prog-container { background: #eee; height: 8px; border-radius: 4px; margin: 10px 0; overflow: hidden; }
-.prog-bar { background: var(--success); height: 100%; transition: width 0.3s ease; }
-
-.btn { padding: 8px 16px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; background: var(--primary); color: white; }
