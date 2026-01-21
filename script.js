@@ -18,32 +18,103 @@ let activeFolderId = null;
 let activeFile = null;
 const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
+// Listener do Firebase - Carrega os dados e chama o Render
 db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
         if (!studyData.folders) studyData.folders = [];
         if (!studyData.settings) studyData.settings = { alarmInterval: 86400000, alarmActive: true };
+        
+        const intervalEl = document.getElementById("alarmInterval");
+        const activeEl = document.getElementById("alarmActive");
+        if(intervalEl) intervalEl.value = studyData.settings.alarmInterval;
+        if(activeEl) activeEl.checked = studyData.settings.alarmActive;
     }
     render();
 });
 
 async function saveAll() {
-    try { await db.ref("studyData").set(studyData); } 
-    catch (e) { console.error("Erro ao salvar:", e); }
+    try {
+        await db.ref("studyData").set(studyData);
+    } catch (e) {
+        console.error("Erro ao salvar:", e);
+    }
 }
 
-function setDay(d) { currentDay = d; mode = "daily"; activeFolderId = null; render(); }
-function viewAll() { mode = "all"; activeFolderId = null; render(); }
+function setDay(d) {
+    currentDay = d;
+    mode = "daily";
+    activeFolderId = null;
+    render();
+}
+
+function viewAll() {
+    mode = "all";
+    activeFolderId = null;
+    render();
+}
+
+function manualSchedule(folderId) {
+    const folder = studyData.folders.find((f) => f.id === folderId);
+    const input = prompt(`Dias (0-6):`, folder.days.join(","));
+    if (input !== null) {
+        folder.days = input.split(",").map((n) => parseInt(n.trim())).filter((n) => !isNaN(n));
+        saveAll();
+    }
+}
+
+async function handleUpload() {
+    const fileInput = document.getElementById("fileInput");
+    const files = fileInput.files;
+    if (files.length === 0) return;
+    const folderName = prompt("Nome da Matéria:");
+    if (!folderName) return;
+
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("upload_preset", UPLOAD_PRESET);
+            const resp = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`, { 
+                method: "POST", 
+                body: formData 
+            });
+            const data = await resp.json();
+
+            if (data.secure_url) {
+                let folder = studyData.folders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
+                if (!folder) {
+                    folder = { id: "f" + Date.now(), name: folderName, files: [], days: [currentDay] };
+                    studyData.folders.push(folder);
+                }
+                folder.files.push({
+                    id: "d" + Date.now(),
+                    name: file.name,
+                    url: data.secure_url.replace("http://", "https://"),
+                    progress: 0,
+                    lastScroll: 0,
+                    lastRead: Date.now()
+                });
+                await saveAll();
+            }
+        } catch (e) {
+            console.error("Erro no upload:", e);
+        }
+    }
+    fileInput.value = "";
+}
 
 async function openPDF(folderId, fileId) {
-    const folder = studyData.folders.find(f => f.id === folderId);
-    activeFile = folder.files.find(f => f.id === fileId);
-    
+    const folder = studyData.folders.find((f) => f.id === folderId);
+    activeFile = folder.files.find((f) => f.id === fileId);
+    activeFolderId = folderId;
+
     const viewer = document.getElementById("viewer");
     viewer.style.display = "flex";
     
-    // POSIÇÃO INVERTIDA: Porcentagem na ESQUERDA | Botão na DIREITA
+    // POSIÇÃO: Porcentagem na ESQUERDA | Botão na DIREITA
     viewer.innerHTML = `
         <div class="viewer-header">
             <span id="scrollPerc" style="font-weight:bold; font-size:1.2em;">${activeFile.progress || 0}%</span>
@@ -57,13 +128,15 @@ async function openPDF(folderId, fileId) {
     try {
         const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
         content.innerHTML = "";
+        
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 1.5 });
+            const viewport = page.getViewport({ scale: 1.4 });
             const canvas = document.createElement("canvas");
             content.appendChild(canvas);
             const context = canvas.getContext("2d");
-            canvas.height = viewport.height; canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
             await page.render({ canvasContext: context, viewport }).promise;
         }
 
@@ -76,8 +149,14 @@ async function openPDF(folderId, fileId) {
             activeFile.lastScroll = content.scrollTop;
             activeFile.lastRead = Date.now();
         };
-        setTimeout(() => { content.scrollTop = activeFile.lastScroll || 0; }, 500);
-    } catch (e) { alert("Erro ao abrir PDF!"); }
+
+        setTimeout(() => { 
+            content.scrollTop = activeFile.lastScroll || 0; 
+        }, 500);
+
+    } catch (e) {
+        alert("Erro ao abrir PDF!");
+    }
 }
 
 async function closeAndSave() {
@@ -88,17 +167,21 @@ async function closeAndSave() {
 
 function render() {
     const now = Date.now();
-    
-    // Renderiza Visão Geral (Dashboard)
+    const config = studyData.settings || { alarmInterval: 86400000, alarmActive: true };
+
+    // Dashboard
     const dashboard = document.getElementById("dashboard");
     if(dashboard && studyData.folders) {
-        dashboard.innerHTML = studyData.folders.map(f => {
+        dashboard.innerHTML = studyData.folders.map((f) => {
             const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
-            return `<div class="dash-card"><h4>📂 ${f.name}</h4><div class="dash-perc">${avg}%</div></div>`;
+            return `<div class="dash-card">
+                        <h4>📂 ${f.name}</h4>
+                        <div class="dash-perc">${avg}%</div>
+                    </div>`;
         }).join("");
     }
 
-    // Renderiza Botões da Semana
+    // Botões da Semana
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
         if (btn) {
@@ -112,10 +195,10 @@ function render() {
     if (!grid) return;
 
     if (activeFolderId) {
-        const folder = studyData.folders.find(f => f.id === activeFolderId);
+        const folder = studyData.folders.find((f) => f.id === activeFolderId);
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
         grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:15px">⬅ Voltar</button>` +
-            folder.files.map(file => `
+            folder.files.map((file) => `
                 <div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
                     <button class="btn-del" onclick="deleteFile(event, '${folder.id}', '${file.id}')">×</button>
                     <h4>📄 ${file.name}</h4>
@@ -125,7 +208,7 @@ function render() {
     } else {
         let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
         document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
-        grid.innerHTML = filtered.map(f => {
+        grid.innerHTML = filtered.map((f) => {
             const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
             return `
             <div class="card" onclick="activeFolderId='${f.id}'; render()">
@@ -141,5 +224,19 @@ function render() {
     }
 }
 
-// ... (mantenha funções deleteFolder, deleteFile, manualSchedule e handleUpload como estavam)
+function deleteFolder(e, id) {
+    e.stopPropagation();
+    if (confirm("Excluir pasta?")) {
+        studyData.folders = studyData.folders.filter((f) => f.id !== id);
+        saveAll();
+    }
+}
+
+function deleteFile(e, fid, id) {
+    e.stopPropagation();
+    const folder = studyData.folders.find((f) => f.id === fid);
+    folder.files = folder.files.filter((f) => f.id !== id);
+    saveAll();
+}
+
 window.onload = () => render();
