@@ -1,60 +1,119 @@
 <!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerenciador de Estudos</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gerenciador de Estudos PRO</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-</head>
-<body>
-    <div class="settings-bar">
-        <label>Revisar em:</label>
-        <select id="alarmInterval" onchange="updateAlarmSettings()">
-            <option value="86400000">1 Dia</option>
-            <option value="172800000">2 Dias</option>
-            <option value="604800000">1 Semana</option>
-        </select>
-        <label>Alarme Ativo:</label>
-        <input type="checkbox" id="alarmActive" onchange="updateAlarmSettings()">
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+
+  </head>
+  <body>
+    <div id="uploadPanel">
+      <div class="upload-header">
+        <span id="uploadStatusTitle">Enviando...</span>
+        <button
+          onclick="document.getElementById('uploadPanel').style.display='none'"
+          style="background: none; border: none; color: white; cursor: pointer"
+        >
+          ✕
+        </button>
+      </div>
+      <div class="upload-list" id="uploadList"></div>
     </div>
 
-    <div id="dashboard"></div>
-    
-    <div class="nav">
-        <button onclick="setDay(0)" id="btn-day-0">Dom</button>
-        <button onclick="setDay(1)" id="btn-day-1">Seg</button>
-        <button onclick="setDay(2)" id="btn-day-2">Ter</button>
-        <button onclick="setDay(3)" id="btn-day-3">Qua</button>
-        <button onclick="setDay(4)" id="btn-day-4">Qui</button>
-        <button onclick="setDay(5)" id="btn-day-5">Sex</button>
-        <button onclick="setDay(6)" id="btn-day-6">Sáb</button>
-        <button onclick="viewAll()">Todas</button>
-    </div>
-
-    <h2 id="dayTitle">Cronograma</h2>
-    <div id="grid" class="grid"></div>
-
-    <div class="upload-section">
-        <input type="file" id="fileInput" multiple accept="application/pdf">
-        <button onclick="handleUpload()" class="btn-upload">Upload PDFs</button>
-    </div>
-
-    <div id="uploadPanel" class="upload-panel" style="display:none">
-        <h3 id="uploadStatusTitle">Enviando...</h3>
-        <div id="uploadList"></div>
-    </div>
-
-    <div id="viewer" class="viewer" style="display:none">
-        <div class="viewer-header">
-            <span id="scrollPerc">0%</span>
-            <button onclick="closeAndSave()">Sair e Salvar</button>
+    <div class="container">
+      <div class="dash-wrapper">
+        <div class="dash-header">
+          <h3 style="margin: 0">📊 Resumo de Matérias</h3>
+          <div class="alarm-config">
+            <span>⏰ Alarme:</span>
+            <select id="alarmInterval" onchange="updateAlarmSettings()">
+              <option value="86400000">24 Horas</option>
+              <option value="172800000">2 Dias</option>
+              <option value="432000000">5 Dias</option>
+              <option value="604800000">7 Dias</option>
+            </select>
+            <label
+              ><input
+                type="checkbox"
+                id="alarmActive"
+                checked
+                onchange="updateAlarmSettings()"
+              />
+              Ativo</label
+            >
+          </div>
         </div>
-        <div id="viewerContent" class="viewer-content"></div>
+        <div id="dashboard" class="dashboard"></div>
+      </div>
+
+      <div class="nav-header">
+        <h1>📚 Meus Estudos</h1>
+        <div class="week-bar">
+          <button id="btn-day-0" class="day-btn" onclick="setDay(0)">
+            Dom
+          </button>
+          <button id="btn-day-1" class="day-btn" onclick="setDay(1)">
+            Seg
+          </button>
+          <button id="btn-day-2" class="day-btn" onclick="setDay(2)">
+            Ter
+          </button>
+          <button id="btn-day-3" class="day-btn" onclick="setDay(3)">
+            Qua
+          </button>
+          <button id="btn-day-4" class="day-btn" onclick="setDay(4)">
+            Qui
+          </button>
+          <button id="btn-day-5" class="day-btn" onclick="setDay(5)">
+            Sex
+          </button>
+          <button id="btn-day-6" class="day-btn" onclick="setDay(6)">
+            Sáb
+          </button>
+          <button class="day-btn" style="background: #eee" onclick="viewAll()">
+            Ver Todas
+          </button>
+        </div>
+      </div>
+
+      <div class="controls">
+        <input
+          type="file"
+          id="fileInput"
+          accept="application/pdf"
+          multiple
+          style="flex: 1"
+        />
+        <button class="btn btn-blue" onclick="handleUpload()">
+          + Adicionar PDFs
+        </button>
+        <button class="btn btn-orange" onclick="autoDistribute()">
+          ⚡ Distribuir Automático
+        </button>
+      </div>
+
+      <h2 id="dayTitle">Carregando...</h2>
+      <div id="grid" class="grid"></div>
     </div>
 
-    <script src="script.js"></script>
-</body>
+    <div class="viewer" id="viewer">
+      <div class="viewer-header">
+        <span id="pdfTitle">Arquivo</span>
+        <div style="display: flex; align-items: center; gap: 20px">
+          <span id="scrollPerc" style="color: var(--success); font-weight: bold"
+            >0%</span
+          >
+          <button onclick="closeAndSave()" class="btn btn-blue">
+            Salvar e Sair
+          </button>
+        </div>
+      </div>
+      <div class="viewer-content" id="viewerContent"></div>
+    </div>
+
+
+  </body>
 </html>
