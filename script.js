@@ -22,10 +22,8 @@ db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
-        // Garante que se folders vier nulo do Firebase, ele vire um array vazio
-        if (!studyData.folders) studyData.folders = []; 
+        if (!studyData.folders) studyData.folders = [];
         if (!studyData.settings) studyData.settings = { alarmInterval: 86400000, alarmActive: true };
-        
         const intervalEl = document.getElementById("alarmInterval");
         const activeEl = document.getElementById("alarmActive");
         if(intervalEl) intervalEl.value = studyData.settings.alarmInterval;
@@ -110,9 +108,6 @@ async function handleUpload() {
             const data = await resp.json();
 
             if (data.secure_url) {
-                // Verificação de segurança para garantir que folders é um array
-                if (!studyData.folders) studyData.folders = [];
-                
                 let folder = studyData.folders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
                 if (!folder) {
                     folder = { id: "f" + Date.now(), name: folderName, files: [], days: [currentDay] };
@@ -138,10 +133,8 @@ async function handleUpload() {
 }
 
 async function openPDF(folderId, fileId) {
-    const folderIndex = studyData.folders.findIndex((f) => f.id === folderId);
-    const folder = studyData.folders[folderIndex];
-    const fileIndex = folder.files.findIndex((f) => f.id === fileId);
-    activeFile = folder.files[fileIndex];
+    const folder = studyData.folders.find((f) => f.id === folderId);
+    activeFile = folder.files.find((f) => f.id === fileId);
     activeFolderId = folderId;
 
     document.getElementById("viewer").style.display = "flex";
@@ -150,7 +143,6 @@ async function openPDF(folderId, fileId) {
 
     try {
         const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
-        if (pdf.numPages === 1 && activeFile.progress === 0) activeFile.progress = 100;
         content.innerHTML = "";
         
         for (let i = 1; i <= pdf.numPages; i++) {
@@ -164,11 +156,13 @@ async function openPDF(folderId, fileId) {
             await page.render({ canvasContext: context, viewport }).promise;
         }
 
+        // RESTAURAÇÃO DA BARRA DE PROGRESSO DE LEITURA
         content.onscroll = () => {
             const totalH = content.scrollHeight - content.clientHeight;
             if (totalH <= 0) return;
             const perc = Math.round((content.scrollTop / totalH) * 100);
-            document.getElementById("scrollPerc").innerText = perc + "%";
+            const scrollPercEl = document.getElementById("scrollPerc");
+            if(scrollPercEl) scrollPercEl.innerText = perc + "%";
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
             activeFile.lastRead = Date.now();
@@ -192,29 +186,21 @@ function render() {
     const now = Date.now();
     const config = studyData.settings || { alarmInterval: 86400000, alarmActive: true };
 
-    // Correção do Erro .map() undefined
     const dashboard = document.getElementById("dashboard");
     if(dashboard && studyData.folders) {
         dashboard.innerHTML = studyData.folders.map((f) => {
-            const files = f.files || [];
-            const avg = files.length ? Math.round(files.reduce((a, b) => a + (b.progress || 0), 0) / files.length) : 0;
-            
-            const folderNeedsReview = files.some(file => 
-                config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval)
-            );
-
-            return `<div class="dash-card ${folderNeedsReview ? 'pasta-revisao' : ''}">
+            const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
+            return `<div class="dash-card">
                         <h4>📂 ${f.name}</h4>
                         <div class="dash-perc">${avg}%</div>
                     </div>`;
         }).join("");
     }
 
-    // BOTÕES DA SEMANA
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
         if (btn) {
-            const hasContent = (studyData.folders || []).some(f => f.days && f.days.includes(i));
+            const hasContent = studyData.folders.some(f => f.days && f.days.includes(i));
             btn.classList.toggle("has-content", hasContent);
             btn.classList.toggle("active", i === currentDay && mode === "daily");
         }
@@ -225,11 +211,9 @@ function render() {
 
     if (activeFolderId) {
         const folder = studyData.folders.find((f) => f.id === activeFolderId);
-        if(!folder) return;
-        
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
         grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:15px">⬅ Voltar</button>` +
-            (folder.files || []).map((file) => {
+            folder.files.map((file) => {
                 const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
                 return `<div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
                     <button class="btn-del" onclick="deleteFile(event, '${folder.id}', '${file.id}')">×</button>
@@ -242,24 +226,16 @@ function render() {
                 </div>`;
             }).join("");
     } else {
-        let filtered = mode === "all" ? (studyData.folders || []) : (studyData.folders || []).filter(f => f.days && f.days.includes(currentDay));
-        const dayTitleEl = document.getElementById("dayTitle");
-        if(dayTitleEl) dayTitleEl.innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
-        
+        let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
+        document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
         grid.innerHTML = filtered.map((f) => {
-            const files = f.files || [];
-            const avg = files.length ? Math.round(files.reduce((a, b) => a + (b.progress || 0), 0) / files.length) : 0;
-            
-            const folderNeedsReview = files.some(file => 
-                config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval)
-            );
-
-            return `<div class="card ${folderNeedsReview ? 'pasta-revisao' : ''}" onclick="activeFolderId='${f.id}'; render()">
+            const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
+            return `<div class="card" onclick="activeFolderId='${f.id}'; render()">
                 <button class="btn-del" onclick="deleteFolder(event, '${f.id}')">×</button>
                 <h3>📂 ${f.name}</h3>
                 <div class="prog-container"><div class="prog-bar" style="width:${avg}%"></div></div>
                 <div style="display:flex; justify-content:space-between; align-items:center">
-                   <small>${files.length} PDFs • ${avg}%</small>
+                   <small>${f.files.length} PDFs • ${avg}%</small>
                    <button class="btn" style="padding:5px" onclick="event.stopPropagation(); manualSchedule('${f.id}')">⚙️</button>
                 </div>
             </div>`;
@@ -278,10 +254,8 @@ function deleteFolder(e, id) {
 function deleteFile(e, fid, id) {
     e.stopPropagation();
     const folder = studyData.folders.find((f) => f.id === fid);
-    if(folder) {
-        folder.files = folder.files.filter((f) => f.id !== id);
-        saveAll();
-    }
+    folder.files = folder.files.filter((f) => f.id !== id);
+    saveAll();
 }
 
 window.onload = () => render();
