@@ -43,11 +43,11 @@ async function openPDF(folderId, fileId) {
     const viewer = document.getElementById("viewer");
     viewer.style.display = "flex";
     
-    // ORDEM ORIGINAL: Botão Salvar na ESQUERDA | Porcentagem na DIREITA
+    // POSIÇÃO INVERTIDA: Porcentagem na ESQUERDA | Botão na DIREITA
     viewer.innerHTML = `
         <div class="viewer-header">
-            <button onclick="closeAndSave()" class="btn btn-danger">Salvar e Fechar</button>
             <span id="scrollPerc" style="font-weight:bold; font-size:1.2em;">${activeFile.progress || 0}%</span>
+            <button onclick="closeAndSave()" class="btn btn-danger">Salvar e Fechar</button>
         </div>
         <div id="viewerContent"><h2>Carregando PDF...</h2></div>
     `;
