@@ -151,12 +151,13 @@ header {
 }
 
 .revisao-badge-bottom {
-    background: var(--danger);
+    background: #ff4757;
     color: white;
-    font-size: 0.75em;
-    padding: 3px 8px;
-    border-radius: 4px;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 5px;
     font-weight: bold;
+    text-transform: uppercase;
 }
 
 .card-footer {
