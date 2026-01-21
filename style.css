@@ -295,7 +295,7 @@ header {
 
     .card button:not(.btn-del) {
         flex: 1; /* Faz ele ocupar o espaço restante sem atropelar o texto */
-        margin-left: 10px;
+        margin-left: 187px;
     }
 
     .upload-floating { width: 90%; left: 5%; }
