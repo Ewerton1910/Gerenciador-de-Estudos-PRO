@@ -254,10 +254,10 @@ header {
 .btn-del {
     position: absolute;
     top: 5px;
-    right: 5px;
+    right: 25px;
     background: none;
     border: none;
-    color: #ccc;
+    color: #e1121294;
     cursor: pointer;
     font-size: 1.2em;
     z-index: 5;
