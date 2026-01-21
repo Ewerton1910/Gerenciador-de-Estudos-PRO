@@ -1,7 +1,6 @@
 import { next } from '@vercel/edge';
 
 export const config = {
-  // Isso garante que o middleware rode em todas as páginas
   matcher: '/:path*',
 };
 
@@ -10,10 +9,9 @@ export default function middleware(req) {
 
   if (authHeader) {
     const authValue = authHeader.split(' ')[1];
-    // Decodifica o login (admin:suasenha)
     const [user, pwd] = atob(authValue).split(':');
 
-    // Compara com a variável que você salvou na Vercel
+    // 'admin' é o usuário padrão do pop-up
     if (user === 'admin' && pwd === process.env.SITE_PASSWORD) {
       return next();
     }
