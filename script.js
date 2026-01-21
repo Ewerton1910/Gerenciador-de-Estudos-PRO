@@ -3,8 +3,7 @@ const CLOUD_NAME = "dgagemtqg";
       const firebaseConfig = {
         apiKey: "AIzaSyDtziafcFDXZd9sGndXleqijouEIcqBeIk",
         authDomain: "gerenciador-de-estudos-9544b.firebaseapp.com",
-        databaseURL:
-          "https://gerenciador-de-estudos-9544b-default-rtdb.firebaseio.com",
+        databaseURL:"https://gerenciador-de-estudos-9544b-default-rtdb.firebaseio.com",
         projectId: "gerenciador-de-estudos-9544b",
       };
 
