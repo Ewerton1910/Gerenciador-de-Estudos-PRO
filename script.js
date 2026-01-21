@@ -22,7 +22,10 @@ db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
+        // Garante que se folders vier nulo do Firebase, ele vire um array vazio
+        if (!studyData.folders) studyData.folders = []; 
         if (!studyData.settings) studyData.settings = { alarmInterval: 86400000, alarmActive: true };
+        
         const intervalEl = document.getElementById("alarmInterval");
         const activeEl = document.getElementById("alarmActive");
         if(intervalEl) intervalEl.value = studyData.settings.alarmInterval;
@@ -107,6 +110,9 @@ async function handleUpload() {
             const data = await resp.json();
 
             if (data.secure_url) {
+                // Verificação de segurança para garantir que folders é um array
+                if (!studyData.folders) studyData.folders = [];
+                
                 let folder = studyData.folders.find(f => f.name.toLowerCase() === folderName.toLowerCase());
                 if (!folder) {
                     folder = { id: "f" + Date.now(), name: folderName, files: [], days: [currentDay] };
@@ -184,16 +190,16 @@ async function closeAndSave() {
 
 function render() {
     const now = Date.now();
-    const config = studyData.settings;
+    const config = studyData.settings || { alarmInterval: 86400000, alarmActive: true };
 
-    // DASHBOARD (Visão Geral) com Alerta de Pasta
+    // Correção do Erro .map() undefined
     const dashboard = document.getElementById("dashboard");
-    if(dashboard) {
+    if(dashboard && studyData.folders) {
         dashboard.innerHTML = studyData.folders.map((f) => {
-            const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
+            const files = f.files || [];
+            const avg = files.length ? Math.round(files.reduce((a, b) => a + (b.progress || 0), 0) / files.length) : 0;
             
-            // Verifica se qualquer arquivo nesta pasta precisa de revisão
-            const folderNeedsReview = f.files.some(file => 
+            const folderNeedsReview = files.some(file => 
                 config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval)
             );
 
@@ -208,19 +214,22 @@ function render() {
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
         if (btn) {
-            const hasContent = studyData.folders.some(f => f.days && f.days.includes(i));
+            const hasContent = (studyData.folders || []).some(f => f.days && f.days.includes(i));
             btn.classList.toggle("has-content", hasContent);
             btn.classList.toggle("active", i === currentDay && mode === "daily");
         }
     }
 
     const grid = document.getElementById("grid");
+    if (!grid) return;
+
     if (activeFolderId) {
-        // VISÃO DA PASTA (Arquivos)
         const folder = studyData.folders.find((f) => f.id === activeFolderId);
+        if(!folder) return;
+        
         document.getElementById("dayTitle").innerText = "📂 " + folder.name;
         grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:15px">⬅ Voltar</button>` +
-            folder.files.map((file) => {
+            (folder.files || []).map((file) => {
                 const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
                 return `<div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
                     <button class="btn-del" onclick="deleteFile(event, '${folder.id}', '${file.id}')">×</button>
@@ -233,14 +242,15 @@ function render() {
                 </div>`;
             }).join("");
     } else {
-        // VISÃO DO CRONOGRAMA (Pastas)
-        let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
-        document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
+        let filtered = mode === "all" ? (studyData.folders || []) : (studyData.folders || []).filter(f => f.days && f.days.includes(currentDay));
+        const dayTitleEl = document.getElementById("dayTitle");
+        if(dayTitleEl) dayTitleEl.innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
+        
         grid.innerHTML = filtered.map((f) => {
-            const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
+            const files = f.files || [];
+            const avg = files.length ? Math.round(files.reduce((a, b) => a + (b.progress || 0), 0) / files.length) : 0;
             
-            // Verifica se a pasta precisa de revisão para marcar o card grande também
-            const folderNeedsReview = f.files.some(file => 
+            const folderNeedsReview = files.some(file => 
                 config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval)
             );
 
@@ -249,7 +259,7 @@ function render() {
                 <h3>📂 ${f.name}</h3>
                 <div class="prog-container"><div class="prog-bar" style="width:${avg}%"></div></div>
                 <div style="display:flex; justify-content:space-between; align-items:center">
-                   <small>${f.files.length} PDFs • ${avg}%</small>
+                   <small>${files.length} PDFs • ${avg}%</small>
                    <button class="btn" style="padding:5px" onclick="event.stopPropagation(); manualSchedule('${f.id}')">⚙️</button>
                 </div>
             </div>`;
@@ -268,8 +278,10 @@ function deleteFolder(e, id) {
 function deleteFile(e, fid, id) {
     e.stopPropagation();
     const folder = studyData.folders.find((f) => f.id === fid);
-    folder.files = folder.files.filter((f) => f.id !== id);
-    saveAll();
+    if(folder) {
+        folder.files = folder.files.filter((f) => f.id !== id);
+        saveAll();
+    }
 }
 
 window.onload = () => render();
