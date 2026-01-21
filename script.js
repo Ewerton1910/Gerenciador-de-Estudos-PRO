@@ -135,23 +135,34 @@ function render() {
 
     const grid = document.getElementById("grid");
     if (activeFolderId) {
-        // --- VISÃO DE ARQUIVOS ---
-        const folder = studyData.folders.find(f => f.id === activeFolderId);
-        document.getElementById("dayTitle").innerText = "📂 " + folder.name;
-        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:10px;">⬅ Voltar</button>` + 
-        folder.files.map(file => {
-            const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
-            return `
-                <div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
-                    <button class="btn-del" onclick="deleteFile(event,'${folder.id}','${file.id}')">×</button>
-                    <h4>${file.name}</h4>
-                    <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
-                    <div class="card-footer">
-                        <small>${file.progress}% concluído</small>
-                        ${isLate ? '<span class="revisao-badge-bottom">REVISÃO</span>' : ''}
-                    </div>
-                </div>`;
-        }).join("");
+    // VISÃO DE ARQUIVOS (Badge embaixo)
+    const folder = studyData.folders.find(f => f.id === activeFolderId);
+    grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:10px;">⬅ Voltar</button>` + 
+    folder.files.map(file => {
+        const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
+        return `
+            <div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
+                <button class="btn-del" onclick="deleteFile(event,'${folder.id}','${file.id}')">×</button>
+                <h4>📄 ${file.name}</h4>
+                <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
+                <div class="card-footer">
+                    <small>${file.progress}%</small>
+                    ${isLate ? '<span class="revisao-badge-bottom">REVISÃO</span>' : ''}
+                </div>
+            </div>`;
+    }).join("");
+} else {
+    // VISÃO DE PASTAS (Borda e Rótulo em cima)
+    grid.innerHTML = filtered.map(f => {
+        const needsReview = f.files.some(file => config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval));
+        return `
+            <div class="card ${needsReview ? 'revisar-pasta' : ''}" onclick="activeFolderId='${f.id}'; render()">
+                ${needsReview ? '<span class="revisar-label-top">⚠️ REVISAR</span>' : ''}
+                <h3>📂 ${f.name}</h3>
+                <div class="prog-container"><div class="prog-bar" style="width:0%"></div></div>
+                <small>${f.files.length} arquivos</small>
+            </div>`;
+    }).join("");
     } else {
         // --- VISÃO DE PASTAS (MATÉRIAS) ---
         const filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days.includes(currentDay));
