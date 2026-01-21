@@ -91,6 +91,7 @@ async function openPDF(folderId, fileId) {
     const folder = studyData.folders.find(f => f.id === folderId);
     activeFile = folder.files.find(f => f.id === fileId);
     activeFolderId = folderId;
+    activeFile.lastRead = Date.now(); // Atualiza ao abrir
 
     document.getElementById("viewer").style.display = "flex";
     document.getElementById("pdfNameTitle").innerText = activeFile.name;
@@ -102,7 +103,7 @@ async function openPDF(folderId, fileId) {
         content.innerHTML = "";
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const viewport = page.getViewport({ scale: 1.5 });
+            const viewport = page.getPage(i).getViewport({ scale: 1.5 });
             const canvas = document.createElement("canvas");
             content.appendChild(canvas);
             const context = canvas.getContext("2d");
@@ -114,66 +115,53 @@ async function openPDF(folderId, fileId) {
             document.getElementById("scrollPerc").innerText = perc + "%";
             activeFile.progress = perc;
             activeFile.lastScroll = content.scrollTop;
-            activeFile.lastRead = Date.now();
         };
         setTimeout(() => content.scrollTop = activeFile.lastScroll || 0, 500);
-    } catch (e) { alert("Erro ao carregar PDF."); }
+    } catch (e) { console.log(e); }
 }
 
 function closeAndSave() { saveAll(); document.getElementById("viewer").style.display = "none"; render(); }
 
+// --- FUNÇÃO RENDER COM A LÓGICA DE PASTA CORRIGIDA ---
 function render() {
     const now = Date.now();
     const config = studyData.settings || { alarmInterval: 86400000, alarmActive: true };
-    
-    // 1. DASHBOARD
-    const dash = document.getElementById("dashboard");
-    dash.innerHTML = studyData.folders.map(f => {
-        const avg = f.files.length ? Math.round(f.files.reduce((a,b)=>a+b.progress,0)/f.files.length) : 0;
-        return `<div class="dash-card"><div class="dash-perc">${avg}%</div><small>${f.name}</small></div>`;
-    }).join("");
-
     const grid = document.getElementById("grid");
+
     if (activeFolderId) {
-    // VISÃO DE ARQUIVOS (Badge embaixo)
-    const folder = studyData.folders.find(f => f.id === activeFolderId);
-    grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:10px;">⬅ Voltar</button>` + 
-    folder.files.map(file => {
-        const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
-        return `
-            <div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
-                <button class="btn-del" onclick="deleteFile(event,'${folder.id}','${file.id}')">×</button>
-                <h4>📄 ${file.name}</h4>
-                <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
-                <div class="card-footer">
-                    <small>${file.progress}%</small>
-                    ${isLate ? '<span class="revisao-badge-bottom">REVISÃO</span>' : ''}
-                </div>
-            </div>`;
-    }).join("");
-} else {
-    // VISÃO DE PASTAS (Borda e Rótulo em cima)
-    grid.innerHTML = filtered.map(f => {
-        const needsReview = f.files.some(file => config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval));
-        return `
-            <div class="card ${needsReview ? 'revisar-pasta' : ''}" onclick="activeFolderId='${f.id}'; render()">
-                ${needsReview ? '<span class="revisar-label-top">⚠️ REVISAR</span>' : ''}
-                <h3>📂 ${f.name}</h3>
-                <div class="prog-container"><div class="prog-bar" style="width:0%"></div></div>
-                <small>${f.files.length} arquivos</small>
-            </div>`;
-    }).join("");
+        // VISÃO INTERNA DA PASTA
+        const folder = studyData.folders.find(f => f.id === activeFolderId);
+        document.getElementById("dayTitle").innerText = "📂 " + folder.name;
+        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:10px;">⬅ Voltar</button>` + 
+        folder.files.map(file => {
+            const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
+            return `
+                <div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
+                    <button class="btn-del" onclick="deleteFile(event,'${folder.id}','${file.id}')">×</button>
+                    <h4>📄 ${file.name}</h4>
+                    <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
+                    <div class="card-footer">
+                        <small>${file.progress}% concluído</small>
+                        ${isLate ? '<span class="revisao-badge-bottom">REVISÃO</span>' : ''}
+                    </div>
+                </div>`;
+        }).join("");
     } else {
-        // --- VISÃO DE PASTAS (MATÉRIAS) ---
-        const filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days.includes(currentDay));
+        // VISÃO GERAL DE MATÉRIAS
+        const filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
         document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Matérias" : dayNames[currentDay];
+        
         grid.innerHTML = filtered.map(f => {
             const avg = f.files.length ? Math.round(f.files.reduce((a,b)=>a+b.progress,0)/f.files.length) : 0;
-            const needsReview = f.files.some(file => config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval));
+            
+            // LÓGICA DA BORDA: Verifica se QUALQUER arquivo desta pasta está atrasado
+            const pastaAtrasada = f.files && f.files.some(file => {
+                return config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
+            });
 
             return `
-                <div class="card ${needsReview ? 'revisar-pasta' : ''}" onclick="activeFolderId='${f.id}'; render()">
-                    ${needsReview ? '<span class="revisar-label-top">REVISAR</span>' : ''}
+                <div class="card ${pastaAtrasada ? 'revisar-pasta' : ''}" onclick="activeFolderId='${f.id}'; render()">
+                    ${pastaAtrasada ? '<span class="revisar-label-top">REVISAR</span>' : ''}
                     <button class="btn-del" onclick="deleteFolder(event,'${f.id}')">×</button>
                     <h3>📂 ${f.name}</h3>
                     <div class="prog-container"><div class="prog-bar" style="width:${avg}%"></div></div>
@@ -182,10 +170,10 @@ function render() {
         }).join("");
     }
 
-    // ATUALIZA BOTÕES DE DIAS
+    // Botões de Dias
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
-        if(btn) btn.className = `day-btn ${i === currentDay && mode === "daily" ? 'active' : ''} ${studyData.folders.some(f=>f.days.includes(i)) ? 'has-content' : ''}`;
+        if(btn) btn.className = `day-btn ${i === currentDay && mode === "daily" ? 'active' : ''} ${studyData.folders.some(f=>f.days && f.days.includes(i)) ? 'has-content' : ''}`;
     }
 }
 
