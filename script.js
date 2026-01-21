@@ -22,9 +22,9 @@ db.ref("studyData").on("value", (snap) => {
     const data = snap.val();
     if (data) {
         studyData = data;
-        // GARANTE QUE FOLDERS NUNCA SEJA UNDEFINED PARA O MAP FUNCIONAR
-        if (!studyData.folders) studyData.folders = []; 
+        if (!studyData.folders) studyData.folders = [];
         if (!studyData.settings) studyData.settings = { alarmInterval: 86400000, alarmActive: true };
+        
         const intervalEl = document.getElementById("alarmInterval");
         const activeEl = document.getElementById("alarmActive");
         if(intervalEl) intervalEl.value = studyData.settings.alarmInterval;
@@ -55,12 +55,6 @@ function manualSchedule(folderId) {
     }
 }
 
-function autoDistribute() {
-    if (studyData.folders.length === 0) return alert("Adicione matérias!");
-    studyData.folders.forEach((folder, index) => { folder.days = [index % 7]; });
-    saveAll();
-}
-
 async function handleUpload() {
     const fileInput = document.getElementById("fileInput");
     const files = fileInput.files;
@@ -77,9 +71,7 @@ async function handleUpload() {
     for (let i = 0; i < files.length; i++) {
         const file = files[i];
         const item = document.createElement("div");
-        item.className = "upload-item";
-        item.id = "up-" + i;
-        item.innerHTML = `<span>📄 ${file.name.substring(0,12)}...</span><div class="spinner"></div>`;
+        item.innerHTML = `<span>📄 ${file.name.substring(0,12)}...</span>`;
         list.appendChild(item);
 
         try {
@@ -99,13 +91,10 @@ async function handleUpload() {
                     id: "d" + Date.now(), name: file.name, url: data.secure_url.replace("http://", "https://"), progress: 0, lastScroll: 0, lastRead: Date.now()
                 });
                 await saveAll();
-                document.getElementById("up-" + i).innerHTML = `<span>📄 ${file.name.substring(0,12)}</span> ✅`;
             }
-        } catch (e) {
-            document.getElementById("up-" + i).innerHTML = `<span>❌ Erro</span>`;
-        }
+        } catch (e) { console.error(e); }
     }
-    document.getElementById("uploadStatusTitle").innerText = "Concluído!";
+    panel.style.display = "none";
     fileInput.value = "";
 }
 
@@ -116,13 +105,15 @@ async function openPDF(folderId, fileId) {
     activeFile = folder.files[fileIndex];
     activeFolderId = folderId;
 
+    // ATUALIZA O LASTREAD AO ABRIR
+    activeFile.lastRead = Date.now();
+
     document.getElementById("viewer").style.display = "flex";
     const content = document.getElementById("viewerContent");
     content.innerHTML = "<h2>Carregando...</h2>";
 
     try {
         const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
-        if (pdf.numPages === 1 && activeFile.progress === 0) activeFile.progress = 100;
         content.innerHTML = "";
         for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
@@ -160,16 +151,42 @@ async function closeAndSave() {
 
 function render() {
     const now = Date.now();
-    const config = studyData.settings;
+    const config = studyData.settings || { alarmInterval: 86400000, alarmActive: true };
+    const grid = document.getElementById("grid");
 
-    const dashboard = document.getElementById("dashboard");
-    if(dashboard) {
-        dashboard.innerHTML = studyData.folders.map((f) => {
+    if (activeFolderId) {
+        const folder = studyData.folders.find((f) => f.id === activeFolderId);
+        document.getElementById("dayTitle").innerText = "📂 " + folder.name;
+        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1; margin-bottom:10px;">⬅ Voltar</button>` +
+            folder.files.map((file) => {
+                // LÓGICA DE REVISÃO RESTAURADA
+                const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
+
+                return `<div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
+                    <button class="btn-del" onclick="deleteFile(event, '${folder.id}', '${file.id}')">×</button>
+                    <h4>📄 ${file.name}</h4>
+                    <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <small>${file.progress}%</small>
+                        ${isLate ? '<span class="revisao-badge">REVISÃO</span>' : ""}
+                    </div>
+                </div>`;
+            }).join("");
+    } else {
+        // Renderização das pastas (visão geral)
+        let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
+        document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
+        grid.innerHTML = filtered.map((f) => {
             const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
-            return `<div class="dash-card"><h4>📂 ${f.name}</h4><div class="dash-perc">${avg}%</div></div>`;
+            return `<div class="card" onclick="activeFolderId='${f.id}'; render()">
+                <h3>📂 ${f.name}</h3>
+                <div class="prog-container"><div class="prog-bar" style="width:${avg}%"></div></div>
+                <small>${f.files.length} PDFs • ${avg}%</small>
+            </div>`;
         }).join("");
     }
 
+    // Atualiza botões de navegação
     for (let i = 0; i <= 6; i++) {
         const btn = document.getElementById(`btn-day-${i}`);
         if (btn) {
@@ -178,43 +195,6 @@ function render() {
             btn.classList.toggle("active", i === currentDay && mode === "daily");
         }
     }
-
-    const grid = document.getElementById("grid");
-    if (activeFolderId) {
-        const folder = studyData.folders.find((f) => f.id === activeFolderId);
-        document.getElementById("dayTitle").innerText = "📂 " + folder.name;
-        grid.innerHTML = `<button onclick="activeFolderId=null; render()" class="btn" style="grid-column:1/-1">⬅ Voltar</button>` +
-            folder.files.map((file) => {
-                const isLate = config.alarmActive && file.lastRead && (now - file.lastRead > config.alarmInterval);
-                return `<div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
-                    ${isLate ? '<div class="revisao-badge">REVISÃO</div>' : ""}
-                    <button class="btn-del" onclick="deleteFile(event, '${folder.id}', '${file.id}')">×</button>
-                    <h4>📄 ${file.name}</h4>
-                    <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
-                    <small>${file.progress}%</small>
-                </div>`;
-            }).join("");
-    } else {
-        let filtered = mode === "all" ? studyData.folders : studyData.folders.filter(f => f.days && f.days.includes(currentDay));
-        document.getElementById("dayTitle").innerText = mode === "all" ? "Todas as Pastas" : "Cronograma de " + dayNames[currentDay];
-        grid.innerHTML = filtered.map((f) => {
-            const avg = f.files.length ? Math.round(f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length) : 0;
-            return `<div class="card" onclick="activeFolderId='${f.id}'; render()">
-                <button class="btn-del" onclick="deleteFolder(event, '${f.id}')">×</button>
-                <h3>📂 ${f.name}</h3>
-                <div class="prog-container"><div class="prog-bar" style="width:${avg}%"></div></div>
-                <div style="display:flex; justify-content:space-between; align-items:center">
-                   <small>${f.files.length} PDFs • ${avg}%</small>
-                   <button class="btn" style="padding:5px" onclick="event.stopPropagation(); manualSchedule('${f.id}')">⚙️</button>
-                </div>
-            </div>`;
-        }).join("");
-    }
-}
-
-function deleteFolder(e, id) {
-    e.stopPropagation();
-    if (confirm("Excluir?")) { studyData.folders = studyData.folders.filter((f) => f.id !== id); saveAll(); }
 }
 
 function deleteFile(e, fid, id) {
