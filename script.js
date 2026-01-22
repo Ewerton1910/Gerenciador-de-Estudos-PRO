@@ -369,4 +369,31 @@ function deleteFile(e, fid, id) {
   folder.files = folder.files.filter((f) => f.id !== id);
   db.ref("studyData").set(studyData);
 }
+// Função para verificar a senha
+function checkPassword() {
+  const input = document.getElementById("passInput").value;
+  const errorMsg = document.getElementById("loginError");
+
+  // Busca a senha definida no Firebase
+  db.ref("acesso").once("value").then((snapshot) => {
+    const senhaCorreta = snapshot.val();
+
+    if (input === senhaCorreta) {
+      // Senha correta: Esconde o bloqueio e salva na sessão (para não pedir toda hora ao dar F5)
+      document.getElementById("loginOverlay").style.display = "none";
+      sessionStorage.setItem("autenticado", "true");
+    } else {
+      // Senha errada
+      errorMsg.style.display = "block";
+      setTimeout(() => { errorMsg.style.display = "none"; }, 3000);
+    }
+  });
+}
+
+// Verifica se já estava logado ao carregar a página
+window.addEventListener('load', () => {
+  if (sessionStorage.getItem("autenticado") === "true") {
+    document.getElementById("loginOverlay").style.display = "none";
+  }
+});
 window.onload = () => render();
