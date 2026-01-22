@@ -3,8 +3,7 @@ const UPLOAD_PRESET = "Gerenciador_Estudos";
 const firebaseConfig = {
   apiKey: "AIzaSyDtziafcFDXZd9sGndXleqijouEIcqBeIk",
   authDomain: "gerenciador-de-estudos-9544b.firebaseapp.com",
-  databaseURL:
-    "https://gerenciador-de-estudos-9544b-default-rtdb.firebaseio.com",
+  databaseURL: "https://gerenciador-de-estudos-9544b-default-rtdb.firebaseio.com",
   projectId: "gerenciador-de-estudos-9544b",
 };
 
@@ -23,11 +22,37 @@ let activeFolderId = null;
 let activeFile = null;
 const dayNames = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-// Carrega dados e configurações
+// --- SISTEMA DE SENHA ---
+function checkPassword() {
+  const input = document.getElementById("passInput").value;
+  const errorMsg = document.getElementById("loginError");
+
+  db.ref("acesso").once("value").then((snapshot) => {
+    const senhaCorreta = snapshot.val();
+    if (input == senhaCorreta) {
+      document.getElementById("loginOverlay").style.display = "none";
+      sessionStorage.setItem("autenticado", "true");
+    } else {
+      errorMsg.style.display = "block";
+      setTimeout(() => { errorMsg.style.display = "none"; }, 3000);
+    }
+  });
+}
+
+// Verifica autenticação ao carregar a página
+window.addEventListener('load', () => {
+  if (sessionStorage.getItem("autenticado") === "true") {
+    document.getElementById("loginOverlay").style.display = "none";
+  }
+});
+
+// Carrega dados e configurações do Firebase
 db.ref("studyData").on("value", (snap) => {
   const data = snap.val();
   if (data) {
     studyData = data;
+    // Garante que as propriedades essenciais existam para não dar erro de "undefined"
+    if (!studyData.folders) studyData.folders = [];
     if (!studyData.settings)
       studyData.settings = { alarmInterval: 86400000, alarmActive: true };
 
@@ -76,7 +101,7 @@ function manualSchedule(folderId) {
 }
 
 function autoDistribute() {
-  if (studyData.folders.length === 0) return alert("Adicione matérias!");
+  if (!studyData.folders || studyData.folders.length === 0) return alert("Adicione matérias!");
   studyData.folders.forEach((folder, index) => {
     folder.days = [index % 7];
   });
@@ -99,10 +124,7 @@ async function handleUpload() {
     const item = document.createElement("div");
     item.className = "upload-item";
     item.id = "up-" + i;
-    item.innerHTML = `<span>📄 ${file.name.substring(
-      0,
-      12
-    )}...</span><div class="spinner"></div>`;
+    item.innerHTML = `<span>📄 ${file.name.substring(0, 12)}...</span><div class="spinner"></div>`;
     list.appendChild(item);
 
     try {
@@ -147,8 +169,6 @@ async function handleUpload() {
   fileInput.value = "";
 }
 
-// --- AS DUAS FUNÇÕES COM CORREÇÃO CRÍTICA DE GRAVAÇÃO ---
-
 async function openPDF(folderId, fileId) {
   const folderIndex = studyData.folders.findIndex((f) => f.id === folderId);
   const fileIndex = studyData.folders[folderIndex].files.findIndex(
@@ -158,7 +178,6 @@ async function openPDF(folderId, fileId) {
   activeFile = studyData.folders[folderIndex].files[fileIndex];
   activeFolderId = folderId;
 
-  // Limpa visualizador e mostra carregando
   document.getElementById("viewer").style.display = "flex";
   const content = document.getElementById("viewerContent");
   content.innerHTML = "<h2>Carregando PDF...</h2>";
@@ -166,9 +185,16 @@ async function openPDF(folderId, fileId) {
   try {
     const pdf = await pdfjsLib.getDocument(activeFile.url).promise;
     content.innerHTML = "";
+    
+    // ESCALA RESPONSIVA MOBILE
+    const containerWidth = content.clientWidth - 30;
+
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
-      const viewport = page.getViewport({ scale: 1.5 });
+      const unscaledViewport = page.getViewport({ scale: 1 });
+      const responsiveScale = containerWidth / unscaledViewport.width;
+      
+      const viewport = page.getViewport({ scale: responsiveScale });
       const canvas = document.createElement("canvas");
       content.appendChild(canvas);
       const context = canvas.getContext("2d");
@@ -177,58 +203,44 @@ async function openPDF(folderId, fileId) {
       await page.render({ canvasContext: context, viewport }).promise;
     }
 
-    // CARREGAR PROGRESSO: Força o scroll para a posição salva
     setTimeout(() => {
       if (activeFile.lastScroll) {
         content.scrollTo({ top: activeFile.lastScroll, behavior: "instant" });
       }
-    }, 300);
+    }, 500);
 
     content.onscroll = () => {
       const totalH = content.scrollHeight - content.clientHeight;
       if (totalH <= 0) return;
       const perc = Math.round((content.scrollTop / totalH) * 100);
       document.getElementById("scrollPerc").innerText = perc + "%";
-
-      // Atualiza localmente
       activeFile.progress = perc;
       activeFile.lastScroll = content.scrollTop;
     };
   } catch (e) {
-    console.error(e);
-    alert("Erro ao carregar PDF. Verifique sua conexão.");
+    alert("Erro ao carregar PDF.");
   }
 }
 
 function closeAndSave() {
   if (!activeFile) return;
-
   const content = document.getElementById("viewerContent");
   const totalH = content.scrollHeight - content.clientHeight;
-
-  // Captura os valores finais antes de fechar
   activeFile.lastScroll = content.scrollTop;
   activeFile.progress =
     totalH > 0
       ? Math.round((content.scrollTop / totalH) * 100)
       : activeFile.progress;
-  activeFile.lastRead = Date.now(); // Atualiza data para o alarme de revisão
+  activeFile.lastRead = Date.now();
 
-  // GRAVAÇÃO FORÇADA: Salva o estado completo no Firebase
   db.ref("studyData")
     .set(studyData)
     .then(() => {
       document.getElementById("viewer").style.display = "none";
       activeFile = null;
       render();
-    })
-    .catch((err) => {
-      alert("Erro ao salvar progresso!");
-      document.getElementById("viewer").style.display = "none";
     });
 }
-
-// --- FIM DAS CORREÇÕES ---
 
 function render() {
   const now = Date.now();
@@ -239,24 +251,24 @@ function render() {
   const dashboard = document.getElementById("dashboard");
   if (!dashboard) return;
 
-  dashboard.innerHTML = studyData.folders
+  // PROTEÇÃO CONTRA ERRO "MAP": Garante que folders seja sempre um array
+  const folders = studyData.folders || [];
+
+  dashboard.innerHTML = folders
     .map((f) => {
-      const avg = f.files.length
+      const files = f.files || [];
+      const avg = files.length
         ? Math.round(
-            f.files.reduce((a, b) => a + (b.progress || 0), 0) / f.files.length
+            files.reduce((a, b) => a + (b.progress || 0), 0) / files.length
           )
         : 0;
       const needsRevision =
         config.alarmActive &&
-        f.files.some(
+        files.some(
           (file) => file.lastRead && now - file.lastRead > config.alarmInterval
         );
       return `<div class="dash-card">
-                    ${
-                      needsRevision
-                        ? '<div class="revisao-badge">REVISAR</div>'
-                        : ""
-                    }
+                    ${needsRevision ? '<div class="revisao-badge">REVISAR</div>' : ""}
                     <h4>📂 ${f.name}</h4>
                     <div class="dash-perc">${avg}%</div>
                     <div style="font-size:0.7em; color:#888;">Progresso</div>
@@ -267,7 +279,7 @@ function render() {
   for (let i = 0; i <= 6; i++) {
     const btn = document.getElementById(`btn-day-${i}`);
     if (btn) {
-      const hasContent = studyData.folders.some(
+      const hasContent = folders.some(
         (f) => f.days && f.days.includes(i)
       );
       btn.classList.toggle("has-content", hasContent);
@@ -277,27 +289,22 @@ function render() {
 
   const grid = document.getElementById("grid");
   if (activeFolderId) {
-    const folder = studyData.folders.find((f) => f.id === activeFolderId);
+    const folder = folders.find((f) => f.id === activeFolderId);
+    if (!folder) { activeFolderId = null; render(); return; }
     document.getElementById("dayTitle").innerText = "📂 " + folder.name;
     grid.innerHTML =
       `<button onclick="activeFolderId=null; render()" class="btn btn-outline" style="grid-column:1/-1">⬅ Voltar</button>` +
-      folder.files
+      (folder.files || [])
         .map((file) => {
           const isLate =
             config.alarmActive &&
             file.lastRead &&
             now - file.lastRead > config.alarmInterval;
-          return `<div class="card" onclick="openPDF('${folder.id}', '${
-            file.id
-          }')">
+          return `<div class="card" onclick="openPDF('${folder.id}', '${file.id}')">
                     ${isLate ? '<div class="revisao-badge">REVISÃO</div>' : ""}
-                    <button class="btn-del" onclick="deleteFile(event, '${
-                      folder.id
-                    }', '${file.id}')">×</button>
+                    <button class="btn-del" onclick="deleteFile(event, '${folder.id}', '${file.id}')">×</button>
                     <h4>📄 ${file.name}</h4>
-                    <div class="prog-container"><div class="prog-bar" style="width:${
-                      file.progress
-                    }%"></div></div>
+                    <div class="prog-container"><div class="prog-bar" style="width:${file.progress}%"></div></div>
                     <small>Visto: ${file.progress}%</small>
                 </div>`;
         })
@@ -305,8 +312,8 @@ function render() {
   } else {
     let filtered =
       mode === "all"
-        ? studyData.folders
-        : studyData.folders.filter(
+        ? folders
+        : folders.filter(
             (f) => f.days && f.days.includes(currentDay)
           );
     document.getElementById("dayTitle").innerText =
@@ -315,40 +322,29 @@ function render() {
         : "Cronograma de " + dayNames[currentDay];
     grid.innerHTML = filtered
       .map((f) => {
-        const avg = f.files.length
+        const files = f.files || [];
+        const avg = files.length
           ? Math.round(
-              f.files.reduce((a, b) => a + (b.progress || 0), 0) /
-                f.files.length
+              files.reduce((a, b) => a + (b.progress || 0), 0) / files.length
             )
           : 0;
         const needsRevision =
           config.alarmActive &&
-          f.files.some(
-            (file) =>
-              file.lastRead && now - file.lastRead > config.alarmInterval
+          files.some(
+            (file) => file.lastRead && now - file.lastRead > config.alarmInterval
           );
         const badges = (f.days || [])
           .map((d) => `<span class="day-tag">${dayNames[d]}</span>`)
           .join("");
         return `<div class="card" onclick="activeFolderId='${f.id}'; render()">
-                    ${
-                      needsRevision
-                        ? '<div class="revisao-badge">REVISAR</div>'
-                        : ""
-                    }
-                    <button class="btn-del" onclick="deleteFolder(event, '${
-                      f.id
-                    }')">×</button>
+                    ${needsRevision ? '<div class="revisao-badge">REVISAR</div>' : ""}
+                    <button class="btn-del" onclick="deleteFolder(event, '${f.id}')">×</button>
                     <h3 style="margin-top:5px">📂 ${f.name}</h3>
                     <div style="margin-bottom:10px">${badges}</div>
                     <div class="prog-container"><div class="prog-bar" style="width:${avg}%"></div></div>
                     <div style="display:flex; justify-content:space-between; margin-top:10px">
-                        <small>${
-                          f.files.length
-                        } PDFs • <b>Média ${avg}%</b></small>
-                        <button class="btn-outline" style="font-size:0.75em; padding:3px 6px" onclick="event.stopPropagation(); manualSchedule('${
-                          f.id
-                        }')">⚙️ Dias</button>
+                        <small>${files.length} PDFs • <b>Média ${avg}%</b></small>
+                        <button class="btn-outline" style="font-size:0.75em; padding:3px 6px" onclick="event.stopPropagation(); manualSchedule('${f.id}')">⚙️ Dias</button>
                     </div>
                 </div>`;
       })
@@ -369,31 +365,4 @@ function deleteFile(e, fid, id) {
   folder.files = folder.files.filter((f) => f.id !== id);
   db.ref("studyData").set(studyData);
 }
-// Função para verificar a senha
-function checkPassword() {
-  const input = document.getElementById("passInput").value;
-  const errorMsg = document.getElementById("loginError");
-
-  // Busca a senha definida no Firebase
-  db.ref("acesso").once("value").then((snapshot) => {
-    const senhaCorreta = snapshot.val();
-
-    if (input === senhaCorreta) {
-      // Senha correta: Esconde o bloqueio e salva na sessão (para não pedir toda hora ao dar F5)
-      document.getElementById("loginOverlay").style.display = "none";
-      sessionStorage.setItem("autenticado", "true");
-    } else {
-      // Senha errada
-      errorMsg.style.display = "block";
-      setTimeout(() => { errorMsg.style.display = "none"; }, 3000);
-    }
-  });
-}
-
-// Verifica se já estava logado ao carregar a página
-window.addEventListener('load', () => {
-  if (sessionStorage.getItem("autenticado") === "true") {
-    document.getElementById("loginOverlay").style.display = "none";
-  }
-});
 window.onload = () => render();
